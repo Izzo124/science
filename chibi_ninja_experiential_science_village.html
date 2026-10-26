@@ -1,0 +1,2322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chibi Ninja: Experiential Science Village</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #fce7f3;
+            font-family: 'Fredoka', 'Nunito', sans-serif;
+        }
+        canvas#webgl {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            outline: none;
+            display: block;
+        }
+        .font-bubble { font-family: 'Fredoka', cursive; }
+        .font-num { font-family: 'Nunito', sans-serif; }
+
+        .pastel-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 3.5px solid #fbcfe8;
+            box-shadow: 0 12px 32px rgba(244, 114, 182, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.95);
+        }
+
+        .pastel-slot {
+            transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .pastel-slot.selected {
+            border-color: #ec4899;
+            box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.45);
+            transform: translateY(-4px) scale(1.08);
+            background: #fdf2f8;
+        }
+
+        /* Virtual Joystick */
+        .joystick-base {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.75);
+            border: 4px solid #f472b6;
+            box-shadow: 0 8px 24px rgba(244, 114, 182, 0.3);
+            position: relative;
+            touch-action: none;
+        }
+        .joystick-thumb {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #f472b6 0%, #db2777 100%);
+            box-shadow: 0 4px 12px rgba(219, 39, 119, 0.5);
+            position: absolute;
+            top: 29px;
+            left: 29px;
+            pointer-events: none;
+            transform: translate(0, 0);
+        }
+
+        #radar-canvas {
+            border-radius: 50%;
+            background: radial-gradient(circle, #eff6ff 0%, #dbeafe 100%);
+            border: 3px solid #93c5fd;
+            box-shadow: 0 4px 14px rgba(147, 197, 253, 0.5);
+        }
+
+        .btn-bounce:active { transform: scale(0.93); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #f472b6; border-radius: 6px; }
+    </style>
+</head>
+<body class="text-slate-800 select-none overflow-hidden">
+    <!-- Main 3D Canvas -->
+    <canvas id="webgl"></canvas>
+
+    <!-- TOP HUD: Stats, Quest Compass & Controls -->
+    <div class="absolute top-3 left-3 right-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 z-20 pointer-events-none">
+        <!-- Player Bio Box -->
+        <div class="pastel-panel rounded-3xl px-4 py-2.5 pointer-events-auto flex items-center space-x-3.5 border-4 border-pink-200">
+            <div class="relative">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-400 to-rose-400 flex items-center justify-center text-white text-2xl shadow-md border-2 border-white">
+                    <span>🥷</span>
+                </div>
+                <div class="absolute -bottom-1 -right-1 bg-amber-400 text-amber-950 font-bold text-[10px] px-2 py-0.5 rounded-full font-bubble shadow-sm">
+                    LV.3
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="font-bubble font-bold text-sm text-pink-700">CHIBI NINJA REN</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-100 text-pink-600 border border-pink-300">
+                        🌸 EXPERIENTIAL LAB
+                    </span>
+                </div>
+                <div class="w-36 md:w-44 bg-pink-100 h-3 rounded-full overflow-hidden mt-1 border border-pink-300 p-0.5">
+                    <div id="harmony-bar" class="h-full bg-gradient-to-r from-pink-400 via-rose-400 to-amber-400 rounded-full transition-all duration-300" style="width: 20%;"></div>
+                </div>
+                <div class="flex justify-between text-[11px] font-semibold text-slate-500 mt-0.5">
+                    <span id="harmony-text" class="text-pink-600">Village Harmony: 20%</span>
+                    <span id="fps-badge" class="font-mono text-emerald-600 text-[10px]">60 FPS</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Radar Minimap & Actions -->
+        <div class="pointer-events-auto flex items-center space-x-2.5">
+            <div class="pastel-panel p-1.5 rounded-3xl flex flex-col items-center">
+                <canvas id="radar-canvas" width="84" height="84"></canvas>
+                <div class="text-[9px] font-bold text-blue-500 mt-0.5 font-num">
+                    <span id="coords-text">X: 0 | Z: 0</span>
+                </div>
+            </div>
+
+            <div class="flex flex-col space-y-1.5">
+                <button id="btn-codex" class="pastel-panel px-3.5 py-1.5 rounded-2xl flex items-center space-x-1.5 text-xs font-bold text-pink-700 hover:bg-pink-50 transition active:scale-95 btn-bounce">
+                    <i data-lucide="book-heart" class="w-4 h-4 text-pink-500"></i>
+                    <span>Science Codex</span>
+                </button>
+                <button id="btn-sound" class="pastel-panel px-3.5 py-1 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition flex items-center justify-center space-x-1 btn-bounce">
+                    <i data-lucide="volume-2" id="sound-icon" class="w-3.5 h-3.5 text-pink-500"></i>
+                    <span id="sound-label">Audio ON</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIVE EXPEDITION QUEST BANNER (Top Right) -->
+    <div class="absolute top-28 right-3 w-80 md:w-96 pastel-panel rounded-3xl p-4 pointer-events-auto z-20 border-r-8 border-pink-400 shadow-xl">
+        <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-pink-200">
+            <span class="text-[11px] uppercase font-bold tracking-wider text-pink-600 flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse"></span>
+                ACTIVE TACTILE OBJECTIVE
+            </span>
+            <span id="quest-chapter-badge" class="text-[10px] font-bold bg-pink-200 px-2 py-0.5 rounded-full text-pink-800">
+                CH. 1
+            </span>
+        </div>
+        <div>
+            <h3 id="quest-title" class="font-bubble font-bold text-sm text-pink-900 flex items-center gap-1.5">
+                🔭 1. Dojo Optical Tower & Eye Focus
+            </h3>
+            <p id="quest-desc" class="text-xs text-slate-600 mt-1 leading-relaxed">
+                Fog blinds the valley! Step onto Master Kenji's optical rig. Stretch the physical glass lens and adjust the iris aperture until light converges sharply on the retina sensor!
+            </p>
+            <div class="mt-2.5 p-2 rounded-2xl bg-pink-50 border border-pink-200 flex items-center justify-between text-xs">
+                <span class="text-slate-500 flex items-center gap-1">
+                    <i data-lucide="map-pin" class="w-3.5 h-3.5 text-pink-500"></i> Apparatus:
+                </span>
+                <span id="quest-nav-target" class="text-pink-700 font-bold font-bubble">Dojo Watchtower [-60, -70]</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTROLS HINT (Desktop) -->
+    <div class="absolute bottom-28 left-5 pointer-events-none hidden md:block">
+        <div class="pastel-panel px-4 py-2 rounded-2xl text-xs font-bubble text-pink-800 flex items-center space-x-2 border-pink-200">
+            <span class="text-lg">🍃</span>
+            <span>HOLD <kbd class="px-2 py-0.5 rounded-lg bg-pink-100 border border-pink-300 font-bold text-pink-700">SHIFT</kbd> FOR SHADOW DASH!</span>
+        </div>
+    </div>
+
+    <!-- INVENTORY HOTBAR -->
+    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-auto">
+        <div id="held-item-label" class="mb-2 text-xs font-bold px-4 py-1.5 rounded-full bg-white/95 border-2 border-pink-300 text-pink-700 flex items-center gap-2 shadow-lg">
+            <span>Hands: Empty (Select 1-5)</span>
+        </div>
+
+        <div class="pastel-panel px-3 py-2 rounded-3xl flex items-center space-x-2 border-4 border-pink-200 shadow-2xl">
+            <div class="pastel-slot w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white border-2 border-pink-200 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="0">
+                <span class="text-[10px] text-pink-300 font-bold absolute top-1 left-1.5">1</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-pink-200"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-pink-600 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="pastel-slot w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white border-2 border-pink-200 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="1">
+                <span class="text-[10px] text-pink-300 font-bold absolute top-1 left-1.5">2</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-pink-200"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-pink-600 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="pastel-slot w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white border-2 border-pink-200 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="2">
+                <span class="text-[10px] text-pink-300 font-bold absolute top-1 left-1.5">3</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-pink-200"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-pink-600 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="pastel-slot w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white border-2 border-pink-200 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="3">
+                <span class="text-[10px] text-pink-300 font-bold absolute top-1 left-1.5">4</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-pink-200"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-pink-600 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="pastel-slot w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white border-2 border-pink-200 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="4">
+                <span class="text-[10px] text-pink-300 font-bold absolute top-1 left-1.5">5</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-pink-200"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-pink-600 absolute bottom-1 right-1.5">0</span>
+            </div>
+
+            <div class="hidden lg:flex flex-col pl-3 border-l-2 border-pink-200 text-[11px] text-slate-500 font-bubble space-y-1">
+                <span><kbd class="px-1.5 py-0.5 rounded bg-pink-100 border border-pink-300 text-pink-700 font-mono font-bold">E</kbd> Interact / Operate</span>
+                <span><kbd class="px-1.5 py-0.5 rounded bg-pink-100 border border-pink-300 text-pink-700 font-mono font-bold">1-5</kbd> Equip Item</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROXIMITY TOOLTIP -->
+    <div id="action-prompt" class="absolute bottom-32 left-1/2 -translate-x-1/2 pastel-panel px-6 py-2.5 rounded-full hidden items-center space-x-3 pointer-events-none z-30 border-3 border-pink-400 shadow-xl animate-bounce">
+        <span class="bg-pink-500 text-white font-bold px-2 py-0.5 rounded-lg text-xs font-bubble" id="action-key-tag">E</span>
+        <span id="action-prompt-label" class="text-sm font-bold text-pink-900">Operate Apparatus</span>
+    </div>
+
+    <!-- DIRECT TACTILE EXPERIENTIAL APPARATUS RIG MODAL -->
+    <div id="rig-modal" class="fixed inset-0 bg-pink-950/45 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="pastel-panel w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-3xl p-6 md:p-8 border-4 border-pink-300 relative shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b-2 border-pink-200">
+                <div class="flex items-center space-x-3">
+                    <div id="rig-icon-box" class="w-14 h-14 rounded-2xl bg-pink-100 border-2 border-pink-300 flex items-center justify-center text-3xl shadow-sm">
+                        🔭
+                    </div>
+                    <div>
+                        <h2 id="rig-title" class="font-bubble text-lg md:text-xl font-bold text-pink-800">Tactile Apparatus</h2>
+                        <p id="rig-subtitle" class="text-xs text-slate-500 font-bubble">Experiential Science Mechanism</p>
+                    </div>
+                </div>
+                <button id="btn-close-rig" class="text-pink-400 hover:text-pink-600 p-2 rounded-xl text-3xl leading-none font-bold">&times;</button>
+            </div>
+
+            <!-- Dynamic Physical Apparatus Canvas / Interactive Surface -->
+            <div id="rig-canvas-container" class="my-4"></div>
+
+            <!-- Interactive Mechanical Controls Area -->
+            <div id="rig-controls-area" class="space-y-4"></div>
+
+            <!-- Live Physical Status Output -->
+            <div id="rig-feedback" class="p-3 rounded-2xl text-xs md:text-sm font-bold mt-4 border-2 hidden"></div>
+
+            <div class="flex justify-end space-x-3 pt-3">
+                <button id="rig-action-btn" class="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 font-bubble text-xs md:text-sm font-bold text-white transition active:scale-95 shadow-md shadow-pink-300">
+                    Engage Mechanism
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KSSM FORM 3 FIELD CODEX -->
+    <div id="codex-modal" class="fixed inset-0 bg-pink-950/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="pastel-panel w-full max-w-3xl max-h-[85vh] rounded-3xl p-6 md:p-8 flex flex-col relative border-4 border-pink-300">
+            <div class="flex justify-between items-center pb-3 border-b-2 border-pink-200">
+                <div class="flex items-center space-x-2.5">
+                    <span class="text-2xl">📖</span>
+                    <h2 class="font-bubble text-xl font-bold text-pink-800">Form 3 KSSM Experiential Field Scroll</h2>
+                </div>
+                <button id="btn-close-codex" class="text-pink-400 hover:text-pink-600 text-3xl p-1 rounded-xl font-bold">&times;</button>
+            </div>
+
+            <div class="overflow-y-auto pr-2 mt-4 space-y-4 text-xs md:text-sm text-slate-700 font-bubble">
+                <div class="bg-purple-50 p-4 rounded-2xl border-2 border-purple-200">
+                    <h3 class="text-purple-700 font-bold text-base flex items-center gap-1.5">
+                        <span>👁️</span> 1. Lens Accommodation & Pupil Reflex (Form 3 Ch. 1)
+                    </h3>
+                    <p class="mt-1 leading-relaxed">
+                        • <b>Ciliary Muscles</b> contract to make the biconvex lens thick for near focus, or relax to flatten it for distant focus.<br>
+                        • <b>Iris Muscles</b> dilate or constrict the pupil aperture to control light quantity.<br>
+                        • Sharp vision occurs only when light converges precisely on the <b>Yellow Spot (Fovea centralis)</b>!
+                    </p>
+                </div>
+
+                <div class="bg-sky-50 p-4 rounded-2xl border-2 border-sky-200">
+                    <h3 class="text-sky-700 font-bold text-base flex items-center gap-1.5">
+                        <span>💧</span> 2. Chemical Water Synthesis & Transpiration Pull (Form 3 Ch. 3)
+                    </h3>
+                    <p class="mt-1 leading-relaxed">
+                        • Chemical synthesis: <code>2H₂ + O₂ → 2H₂O</code> in a 2:1 stoichiometric proportion.<br>
+                        • Liquid water in roots travels upwards through continuous <b>xylem vessels</b> via <b>transpiration pull</b>, evaporating through leaf stomata.
+                    </p>
+                </div>
+
+                <div class="bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
+                    <h3 class="text-orange-700 font-bold text-base flex items-center gap-1.5">
+                        <span>⚒️</span> 3. Blast Furnace Extraction of Metals (Form 3 Ch. 4 & 5)
+                    </h3>
+                    <p class="mt-1 leading-relaxed">
+                        • Iron is extracted by chemical reduction using Carbon (Coke): <code>2Fe₂O₃ + 3C → 4Fe + 3CO₂↑</code>.<br>
+                        • Pumping the blast furnace bellows supplies hot air for exothermic coke combustion, melting pure molten iron to cast solid bridge spans!
+                    </p>
+                </div>
+
+                <div class="bg-amber-50 p-4 rounded-2xl border-2 border-amber-200">
+                    <h3 class="text-amber-700 font-bold text-base flex items-center gap-1.5">
+                        <span>⚡</span> 4. Electricity Transmission & Heat Loss P = I²R (Form 3 Ch. 6)
+                    </h3>
+                    <p class="mt-1 leading-relaxed">
+                        • Overheating power loss is <code>P_loss = I²R</code>.<br>
+                        • By stepping up voltage using secondary turns (Ns > Np) via a <b>Step-Up Transformer</b> to 132 kV, current (I) drops dramatically, cooling the power lines!
+                    </p>
+                </div>
+
+                <div class="bg-emerald-50 p-4 rounded-2xl border-2 border-emerald-200">
+                    <h3 class="text-emerald-700 font-bold text-base flex items-center gap-1.5">
+                        <span>☢️</span> 5. Penetrating Power of Ionizing Rays (Form 3 Ch. 8)
+                    </h3>
+                    <p class="mt-1 leading-relaxed">
+                        • <b>Alpha (α)</b>: Heavy helium nucleus, stopped by <b>Washi Paper</b>.<br>
+                        • <b>Beta (β)</b>: Fast electrons, stopped by <b>5mm Aluminium plate</b>.<br>
+                        • <b>Gamma (γ)</b>: Penetrating electromagnetic ray, stopped only by thick <b>dense Lead (Pb)</b>!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE TOUCH CONTROLS -->
+    <div class="absolute bottom-5 left-5 z-30 pointer-events-auto md:hidden">
+        <div id="joystick-base" class="joystick-base">
+            <div id="joystick-thumb" class="joystick-thumb"></div>
+        </div>
+    </div>
+
+    <div class="absolute bottom-5 right-5 z-30 pointer-events-auto md:hidden flex flex-col space-y-3 items-end">
+        <button id="btn-mobile-dash" class="w-14 h-14 rounded-3xl bg-pink-500 active:bg-pink-600 border-3 border-white text-white font-bubble font-bold text-xs flex flex-col items-center justify-center shadow-lg active:scale-95 btn-bounce">
+            <i data-lucide="zap" class="w-5 h-5 mb-0.5"></i> DASH
+        </button>
+        <button id="btn-mobile-act" class="w-16 h-16 rounded-3xl bg-rose-500 active:bg-rose-600 border-4 border-white text-white font-bubble font-bold text-xs flex flex-col items-center justify-center shadow-xl active:scale-95 btn-bounce">
+            <i data-lucide="hand" class="w-6 h-6 mb-0.5"></i> OPERATE
+        </button>
+        <button id="btn-mobile-jump" class="w-14 h-14 rounded-3xl bg-amber-400 active:bg-amber-500 border-3 border-white text-amber-950 font-bubble font-bold text-xs flex flex-col items-center justify-center shadow-md active:scale-95 btn-bounce">
+            <i data-lucide="arrow-up" class="w-5 h-5"></i> JUMP
+        </button>
+    </div>
+
+    <!-- BANNER TOAST -->
+    <div id="banner-notification" class="absolute top-24 left-1/2 -translate-x-1/2 pastel-panel px-6 py-3 rounded-3xl border-3 border-pink-400 shadow-2xl z-40 transform -translate-y-28 opacity-0 transition-all duration-300 pointer-events-none flex items-center space-x-3">
+        <div id="banner-icon" class="text-2xl">🌸</div>
+        <div>
+            <h4 id="banner-title" class="font-bubble text-xs font-bold text-pink-700">PHENOMENON UNLOCKED</h4>
+            <p id="banner-text" class="text-xs font-bold text-slate-800">Physical change active!</p>
+        </div>
+    </div>
+
+    <!-- ENGINE LOGIC -->
+    <script>
+        /* ==========================================================================
+           1. PROCEDURAL SOUND SYNTHESIZER (Native Web Audio API)
+           ========================================================================== */
+        const SoundFX = {
+            ctx: null,
+            muted: false,
+            activeVoices: 0,
+            maxVoices: 6,
+
+            init() {
+                if (this.ctx) return;
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                } catch(e) {}
+            },
+
+            unlock() {
+                if (!this.ctx) this.init();
+                if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+            },
+
+            playChime(freq, type = 'sine', duration = 0.12, gain = 0.12) {
+                if (this.muted) return;
+                this.unlock();
+                if (!this.ctx || this.ctx.state !== 'running') return;
+                if (this.activeVoices >= this.maxVoices) return;
+
+                this.activeVoices++;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, now);
+                    g.gain.setValueAtTime(gain, now);
+                    g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+                    osc.connect(g);
+                    g.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + duration);
+                    osc.onended = () => { this.activeVoices = Math.max(0, this.activeVoices - 1); };
+                } catch(e) {
+                    this.activeVoices = Math.max(0, this.activeVoices - 1);
+                }
+            },
+
+            playStep() {
+                this.playChime(620 + Math.random() * 80, 'triangle', 0.04, 0.035);
+            },
+
+            playHarvest() {
+                this.playChime(523.25, 'sine', 0.08, 0.12);
+                setTimeout(() => this.playChime(783.99, 'triangle', 0.12, 0.14), 60);
+            },
+
+            playWaterRush() {
+                this.playChime(440, 'sine', 0.35, 0.18);
+                setTimeout(() => this.playChime(659.25, 'sine', 0.45, 0.22), 100);
+                setTimeout(() => this.playChime(880, 'triangle', 0.5, 0.2), 220);
+            },
+
+            playBellowsPump() {
+                this.playChime(110, 'sawtooth', 0.22, 0.18);
+                setTimeout(() => this.playChime(220, 'triangle', 0.3, 0.16), 80);
+            },
+
+            playTransformerHum() {
+                this.playChime(60, 'sawtooth', 0.4, 0.2);
+                setTimeout(() => this.playChime(120, 'sine', 0.4, 0.15), 50);
+            },
+
+            playSparkIgnition() {
+                this.playChime(180, 'sawtooth', 0.1, 0.22);
+                setTimeout(() => this.playChime(950, 'square', 0.15, 0.25), 50);
+            },
+
+            playBeaconBeam() {
+                this.playChime(523.25, 'triangle', 0.3, 0.2);
+                setTimeout(() => this.playChime(1046.50, 'sine', 0.6, 0.25), 120);
+            },
+
+            playGeigerClick() {
+                this.playChime(3200 + Math.random() * 600, 'square', 0.015, 0.06);
+            },
+
+            playFanfare() {
+                if (this.muted) return;
+                const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                notes.forEach((f, idx) => {
+                    setTimeout(() => this.playChime(f, 'triangle', 0.28, 0.2), idx * 85);
+                });
+            }
+        };
+
+        ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+            window.addEventListener(evt, () => SoundFX.unlock(), { once: true, passive: true });
+        });
+
+        /* ==========================================================================
+           2. 2D SPATIAL HASH GRID & SLIDING COLLISION SYSTEM (O(1))
+           ========================================================================== */
+        class SpatialGrid {
+            constructor(cellSize = 20) {
+                this.cellSize = cellSize;
+                this.grid = new Map();
+                this.colliders = [];
+            }
+            _key(cx, cz) { return `${cx}_${cz}`; }
+
+            addBox(cx, cz, sizeX, sizeZ, height = 15, cy = 0, name = 'box') {
+                const hx = sizeX / 2;
+                const hz = sizeZ / 2;
+                const c = {
+                    type: 'box',
+                    minX: cx - hx, maxX: cx + hx,
+                    minZ: cz - hz, maxZ: cz + hz,
+                    minY: cy - height / 2, maxY: cy + height / 2,
+                    name
+                };
+                this.colliders.push(c);
+                this._insert(c, c.minX, c.maxX, c.minZ, c.maxZ);
+            }
+
+            addCylinder(cx, cz, radius, height = 20, cy = 0, name = 'cylinder') {
+                const c = {
+                    type: 'cylinder',
+                    x: cx, z: cz, radius,
+                    minY: cy - height / 2, maxY: cy + height / 2,
+                    name
+                };
+                this.colliders.push(c);
+                this._insert(c, cx - radius, cx + radius, cz - radius, cz + radius);
+            }
+
+            _insert(c, minX, maxX, minZ, maxZ) {
+                const sX = Math.floor(minX / this.cellSize);
+                const eX = Math.floor(maxX / this.cellSize);
+                const sZ = Math.floor(minZ / this.cellSize);
+                const eZ = Math.floor(maxZ / this.cellSize);
+                for (let x = sX; x <= eX; x++) {
+                    for (let z = sZ; z <= eZ; z++) {
+                        const k = this._key(x, z);
+                        if (!this.grid.has(k)) this.grid.set(k, []);
+                        this.grid.get(k).push(c);
+                    }
+                }
+            }
+
+            queryNear(x, z, radius, outList) {
+                outList.length = 0;
+                const sX = Math.floor((x - radius) / this.cellSize);
+                const eX = Math.floor((x + radius) / this.cellSize);
+                const sZ = Math.floor((z - radius) / this.cellSize);
+                const eZ = Math.floor((z + radius) / this.cellSize);
+                for (let cx = sX; cx <= eX; cx++) {
+                    for (let cz = sZ; cz <= eZ; cz++) {
+                        const list = this.grid.get(this._key(cx, cz));
+                        if (list) {
+                            for (let i = 0; i < list.length; i++) {
+                                const c = list[i];
+                                if (!outList.includes(c)) outList.push(c);
+                            }
+                        }
+                    }
+                }
+                return outList;
+            }
+        }
+
+        const spatialGrid = new SpatialGrid(22);
+        const _queryResults = [];
+
+        function resolvePlayerSlide(pos, dispX, dispZ, playerRadius, playerHeight) {
+            let nextX = pos.x + dispX;
+            let nextZ = pos.z + dispZ;
+            const pY = pos.y;
+
+            spatialGrid.queryNear(nextX, nextZ, playerRadius + 3, _queryResults);
+
+            for (let i = 0; i < _queryResults.length; i++) {
+                const c = _queryResults[i];
+                if (pY + playerHeight < c.minY || pY > c.maxY) continue;
+
+                if (c.type === 'cylinder') {
+                    const dx = nextX - c.x;
+                    const dz = nextZ - c.z;
+                    const dSq = dx * dx + dz * dz;
+                    const minDist = c.radius + playerRadius;
+                    if (dSq < minDist * minDist) {
+                        const dist = Math.sqrt(dSq);
+                        if (dist > 0.0001) {
+                            nextX = c.x + (dx / dist) * minDist;
+                            nextZ = c.z + (dz / dist) * minDist;
+                        } else {
+                            nextX = c.x + minDist;
+                        }
+                    }
+                } else if (c.type === 'box') {
+                    const cx = Math.max(c.minX, Math.min(nextX, c.maxX));
+                    const cz = Math.max(c.minZ, Math.min(nextZ, c.maxZ));
+                    const diffX = nextX - cx;
+                    const diffZ = nextZ - cz;
+                    const dSq = diffX * diffX + diffZ * diffZ;
+
+                    if (nextX >= c.minX && nextX <= c.maxX && nextZ >= c.minZ && nextZ <= c.maxZ) {
+                        const dl = Math.abs(nextX - c.minX);
+                        const dr = Math.abs(c.maxX - nextX);
+                        const db = Math.abs(nextZ - c.minZ);
+                        const dt = Math.abs(c.maxZ - nextZ);
+                        const minP = Math.min(dl, dr, db, dt);
+                        if (minP === dl) nextX = c.minX - playerRadius;
+                        else if (minP === dr) nextX = c.maxX + playerRadius;
+                        else if (minP === db) nextZ = c.minZ - playerRadius;
+                        else nextZ = c.maxZ + playerRadius;
+                    } else if (dSq < playerRadius * playerRadius) {
+                        const dist = Math.sqrt(dSq);
+                        if (dist > 0.0001) {
+                            const pen = playerRadius - dist;
+                            nextX += (diffX / dist) * pen;
+                            nextZ += (diffZ / dist) * pen;
+                        }
+                    }
+                }
+            }
+
+            const rad = Math.hypot(nextX, nextZ);
+            if (rad > 210) {
+                const r = 210 / rad;
+                nextX *= r;
+                nextZ *= r;
+            }
+
+            pos.x = nextX;
+            pos.z = nextZ;
+        }
+
+        /* ==========================================================================
+           3. INVENTORY ITEMS & GAME STATE
+           ========================================================================== */
+        const ITEMS = {
+            HYDROGEN_CAN: { id: 'HYDROGEN_CAN', name: 'Hydrogen Gas (H₂)', icon: 'flame', color: '#f97316', chapter: 'Ch. 3' },
+            OXYGEN_TANK: { id: 'OXYGEN_TANK', name: 'Oxygen Gas (O₂)', icon: 'wind', color: '#38bdf8', chapter: 'Ch. 3' },
+            HEMATITE_ORE: { id: 'HEMATITE_ORE', name: 'Hematite Ore (Fe₂O₃)', icon: 'box', color: '#ea580c', chapter: 'Ch. 4' },
+            COKE_CARBON: { id: 'COKE_CARBON', name: 'Coke / Carbon (C)', icon: 'square', color: '#475569', chapter: 'Ch. 4' },
+            PAPER_SHEET: { id: 'PAPER_SHEET', name: 'Washi Paper (α Shield)', icon: 'file-text', color: '#f8fafc', chapter: 'Ch. 8' },
+            ALU_PLATE: { id: 'ALU_PLATE', name: '5mm Aluminium Plate (β)', icon: 'layers', color: '#cbd5e1', chapter: 'Ch. 8' },
+            LEAD_BLOCK: { id: 'LEAD_BLOCK', name: 'Dense Lead Ingot (γ)', icon: 'shield-alert', color: '#334155', chapter: 'Ch. 8' }
+        };
+
+        const gameState = {
+            player: {
+                selectedSlot: 0,
+                inventory: [null, null, null, null, null],
+                speed: 0.28,
+                sprintMult: 2.1,
+                isGrounded: true,
+                jumpVel: 0,
+                gravity: 0.016,
+                radius: 0.75
+            },
+            currentQuestIndex: 0,
+            quests: [
+                {
+                    id: 'q1_optics',
+                    chapter: 'CH. 1',
+                    title: '1. Dojo Optical Tower & Eye Focus',
+                    desc: 'Fog blinds the valley! Step onto Master Kenji\'s optical rig. Physically stretch the convex lens and adjust the iris aperture until light converges sharply on the retina sensor!',
+                    nav: 'Dojo Watchtower [-60, -70]',
+                    apparatusId: 'rig_optics',
+                    pos: new THREE.Vector3(-60, 0, -70),
+                    solved: false
+                },
+                {
+                    id: 'q2_water',
+                    chapter: 'CH. 3',
+                    title: '2. Chemical Water Synthesis & Aqueduct',
+                    desc: 'Rice paddies dried up! Drop 2 Hydrogen (H₂) & 1 Oxygen (O₂) into the synthesis hopper, then crank the magneto spark lever to ignite water and spin the waterwheel!',
+                    nav: 'Botanist Aqueduct [-110, 45]',
+                    apparatusId: 'rig_water',
+                    pos: new THREE.Vector3(-110, 0, 45),
+                    solved: false
+                },
+                {
+                    id: 'q3_forge',
+                    chapter: 'CH. 4 & 5',
+                    title: '3. Blast Furnace Reduction & Bridge Casting',
+                    desc: 'River bridge collapsed! Load Hematite (Fe₂O₃) and Carbon into the blast furnace. Pump the bellows to stoke incandescent heat and pour molten iron bridge girders!',
+                    nav: 'Blacksmith Forge [85, 45]',
+                    apparatusId: 'rig_forge',
+                    pos: new THREE.Vector3(85, 0, 45),
+                    solved: false
+                },
+                {
+                    id: 'q4_grid',
+                    chapter: 'CH. 6',
+                    title: '4. Transformer Coil & Power Loss P = I²R',
+                    desc: 'Transmission lines are glowing red hot and smoking! Wind secondary coils on the transformer core (Step-Up to 132kV). Watch current drop and lines cool down!',
+                    nav: 'Festival Substation [15, -45]',
+                    apparatusId: 'rig_grid',
+                    pos: new THREE.Vector3(15, 0, -45),
+                    solved: false
+                },
+                {
+                    id: 'q5_rad',
+                    chapter: 'CH. 8',
+                    title: '5. Hot Spring Radiation Penetration Test',
+                    desc: 'The Onsen fissure is leaking Alpha, Beta, and Gamma rays! Experimentally test and slot Paper, Aluminium, and Lead into the beam pipes until the hot spring cleanses!',
+                    nav: 'Onsen Hot Spring [0, 110]',
+                    apparatusId: 'rig_rad',
+                    pos: new THREE.Vector3(0, 0, 110),
+                    solved: false
+                }
+            ],
+            // Tactile Physics Puzzle Real-Time State
+            tactileState: {
+                optics: { lensThickness: 20, apertureSize: 90, focused: false },
+                water: { h2Count: 0, o2Count: 0, crankRot: 0, sparkCount: 0 },
+                forge: { hematiteLoaded: false, carbonLoaded: false, bellowsPumps: 0, temp: 400 },
+                grid: { secondaryTurns: 1, currentAmps: 180, voltageKV: 11, lineCool: false },
+                rad: { alphaSlot: null, betaSlot: null, gammaSlot: null }
+            },
+            activeInteractable: null,
+            modalOpen: false
+        };
+
+        /* ==========================================================================
+           4. THREE.JS ENVIRONMENT SETUP WITH SOFT PASTEL PALETTE
+           ========================================================================== */
+        const canvas = document.getElementById('webgl');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xfdf2f8);
+        scene.fog = new THREE.FogExp2(0xfdf2f8, 0.0035);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 750);
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // Ambient & Directional Lighting
+        const hemiLight = new THREE.HemisphereLight(0xfff1f2, 0xdcfce7, 0.95);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffedd5, 1.15);
+        sunLight.position.set(90, 140, 70);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 1024;
+        sunLight.shadow.mapSize.height = 1024;
+        sunLight.shadow.camera.near = 20;
+        sunLight.shadow.camera.far = 380;
+        const d = 150;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.bias = -0.0006;
+        scene.add(sunLight);
+
+        // Ground Platform (Pastel Meadow Green)
+        const groundGeo = new THREE.CylinderGeometry(220, 220, 3, 32);
+        const groundMat = new THREE.MeshLambertMaterial({ color: 0xbbf7d0 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.position.y = -1.5;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Common Pastel Materials
+        const mats = {
+            wood: new THREE.MeshLambertMaterial({ color: 0xfde047 }),
+            darkWood: new THREE.MeshLambertMaterial({ color: 0xb45309 }),
+            terracotta: new THREE.MeshLambertMaterial({ color: 0xf87171 }),
+            creamWall: new THREE.MeshLambertMaterial({ color: 0xfffbeb }),
+            sakuraPink: new THREE.MeshLambertMaterial({ color: 0xf472b6 }),
+            pastelPine: new THREE.MeshLambertMaterial({ color: 0x86efac }),
+            stone: new THREE.MeshLambertMaterial({ color: 0xd1d5db }),
+            riverDry: new THREE.MeshLambertMaterial({ color: 0xe2e8f0 }),
+            riverWater: new THREE.MeshLambertMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.88 }),
+            lanternRed: new THREE.MeshLambertMaterial({ color: 0xf43f5e, emissive: 0x9f1239, emissiveIntensity: 0.35 }),
+            hotSpringTurquoise: new THREE.MeshLambertMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.85 })
+        };
+
+        const interactables = [];
+        const dynamicVisuals = {
+            riverWater: null,
+            waterwheelMesh: null,
+            waterwheelSpinning: false,
+            beaconBeam: null,
+            bridgeMesh: null,
+            moltenTrough: null,
+            powerCables: [],
+            cableSmoking: true,
+            lanterns: [],
+            springWater: null,
+            radBeams: { a: null, b: null, g: null },
+            petals: [],
+            npcs: []
+        };
+
+        /* ==========================================================================
+           5. BUILD THE COZY SAKURA SCIENCE VILLAGE
+           ========================================================================== */
+
+        // 5.1 Trees
+        function spawnSakuraTree(x, z, scale = 1.0) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * scale, 0.8 * scale, 5 * scale, 8), mats.darkWood);
+            trunk.position.y = 2.5 * scale;
+            trunk.castShadow = true;
+            group.add(trunk);
+
+            const canopy1 = new THREE.Mesh(new THREE.DodecahedronGeometry(3.6 * scale), mats.sakuraPink);
+            canopy1.position.y = 5.8 * scale;
+            canopy1.castShadow = true;
+            group.add(canopy1);
+
+            const canopy2 = new THREE.Mesh(new THREE.DodecahedronGeometry(2.5 * scale), new THREE.MeshLambertMaterial({ color: 0xfbcfe8 }));
+            canopy2.position.set(1.4 * scale, 6.2 * scale, 0.8 * scale);
+            group.add(canopy2);
+
+            scene.add(group);
+            spatialGrid.addCylinder(x, z, 1.2 * scale, 7 * scale, 3.5 * scale, 'sakura_tree');
+        }
+
+        [
+            [-30, 20], [-45, 45], [-75, 25], [-125, 40], [-105, 80],
+            [35, -25], [50, -60], [-70, -40], [-90, -70], [80, 80],
+            [110, 20], [60, 60], [-20, -110], [40, -110], [0, -130]
+        ].forEach(([tx, tz], i) => {
+            spawnSakuraTree(tx, tz, 1.0 + (i % 3) * 0.18);
+        });
+
+        // Falling Sakura Petals Particle Pool
+        const petalGeo = new THREE.PlaneGeometry(0.3, 0.3);
+        const petalMat = new THREE.MeshBasicMaterial({ color: 0xfbcfe8, side: THREE.DoubleSide });
+        for (let p = 0; p < 45; p++) {
+            const petal = new THREE.Mesh(petalGeo, petalMat);
+            petal.position.set((Math.random() - 0.5) * 160, 3 + Math.random() * 15, (Math.random() - 0.5) * 160);
+            petal.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+            scene.add(petal);
+            dynamicVisuals.petals.push(petal);
+        }
+
+        // 5.2 Buildings & Shops
+        function createCozyHouse(x, z, w, d, h, roofColor, name = 'house') {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const walls = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats.creamWall);
+            walls.position.y = h / 2;
+            walls.castShadow = true;
+            walls.receiveShadow = true;
+            group.add(walls);
+
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.hypot(w, d) * 0.72, 3.5, 4), new THREE.MeshLambertMaterial({ color: roofColor }));
+            roof.position.y = h + 1.6;
+            roof.rotation.y = Math.PI / 4;
+            roof.castShadow = true;
+            group.add(roof);
+
+            scene.add(group);
+            spatialGrid.addBox(x, z, w + 0.5, d + 0.5, h + 3, h / 2, name);
+        }
+
+        createCozyHouse(35, -45, 14, 9, 6.5, 0xf87171, 'ramen_shop');
+        createCozyHouse(55, 10, 9, 8, 5.2, 0x86efac, 'matcha_teahouse');
+        createCozyHouse(-45, 0, 10, 8, 5.5, 0xf472b6, 'apothecary');
+
+        // 5.3 Quest 1: Master Kenji's Dojo & Optical Watchtower (X: -60, Z: -70)
+        function buildOpticalDojo(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const dojo = new THREE.Mesh(new THREE.BoxGeometry(16, 7.5, 14), mats.creamWall);
+            dojo.position.y = 3.75;
+            dojo.castShadow = true;
+            group.add(dojo);
+            spatialGrid.addBox(x, z, 16, 14, 7.5, 3.75, 'dojo');
+
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(15, 4.2, 4), new THREE.MeshLambertMaterial({ color: 0x38bdf8 }));
+            roof.position.y = 9.4;
+            roof.rotation.y = Math.PI / 4;
+            group.add(roof);
+
+            // Optical Watchtower Rig Stand
+            const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 9, 8), mats.darkWood);
+            tower.position.set(0, 4.5, 9.5);
+            group.add(tower);
+            spatialGrid.addCylinder(x, z + 9.5, 1.4, 9, 4.5, 'optic_tower_stand');
+
+            // Retinal Sensor & Beacon Beam
+            const ray = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.18, 0.18, 55, 8),
+                new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.25 })
+            );
+            ray.rotation.x = Math.PI / 2;
+            ray.position.set(0, 8.5, -20);
+            group.add(ray);
+            dynamicVisuals.beaconBeam = ray;
+
+            scene.add(group);
+
+            interactables.push({
+                id: 'interact_optics',
+                name: 'Dojo Optical Watchtower Rig',
+                position: new THREE.Vector3(x, 1, z + 9.5),
+                radius: 4.5,
+                action: 'open_rig',
+                apparatusKey: 'optics'
+            });
+        }
+        buildOpticalDojo(-60, -70);
+
+        // 5.4 Quest 2: Botanist Water Synthesis & Bamboo Aqueduct (X: -110, Z: 45)
+        function buildWaterAqueduct(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            // Synthesis Chamber Hopper
+            const hopper = new THREE.Mesh(new THREE.BoxGeometry(6, 4.5, 6), mats.wood);
+            hopper.position.y = 2.25;
+            hopper.castShadow = true;
+            group.add(hopper);
+            spatialGrid.addBox(x, z, 6, 6, 4.5, 2.25, 'synthesis_hopper');
+
+            // Bamboo Aqueduct Canal
+            const canal = new THREE.Mesh(new THREE.BoxGeometry(32, 1.2, 2.2), mats.darkWood);
+            canal.position.set(16, 2.2, 0);
+            group.add(canal);
+
+            // Waterwheel
+            const wheelGeo = new THREE.CylinderGeometry(3.5, 3.5, 0.8, 12);
+            const wheel = new THREE.Mesh(wheelGeo, mats.wood);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(33, 3.5, 0);
+            group.add(wheel);
+            dynamicVisuals.waterwheelMesh = wheel;
+            spatialGrid.addBox(x + 33, z, 2, 4, 7, 3.5, 'waterwheel');
+
+            scene.add(group);
+
+            interactables.push({
+                id: 'interact_water',
+                name: 'Chemical Water Synthesizer Hopper',
+                position: new THREE.Vector3(x, 1, z),
+                radius: 4.8,
+                action: 'open_rig',
+                apparatusKey: 'water'
+            });
+        }
+        buildWaterAqueduct(-110, 45);
+
+        // Riverbed & Bridge Setup
+        function buildRiverSystem() {
+            // Dry Riverbed
+            const riverDry = new THREE.Mesh(new THREE.BoxGeometry(240, 0.4, 16), mats.riverDry);
+            riverDry.position.set(0, -0.7, 0);
+            scene.add(riverDry);
+
+            // Dynamic Flowing Water Mesh (Scaled up when Ch 3 is solved)
+            const water = new THREE.Mesh(new THREE.BoxGeometry(240, 0.6, 15.5), mats.riverWater);
+            water.position.set(0, -0.5, 0);
+            water.scale.set(0.01, 1, 1);
+            scene.add(water);
+            dynamicVisuals.riverWater = water;
+
+            // Quest 3 Bridge (X: 50, Z: 0)
+            const bridgeMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(18, 1.2, 7),
+                new THREE.MeshLambertMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.35 })
+            );
+            bridgeMesh.position.set(50, 0.6, 0);
+            scene.add(bridgeMesh);
+            dynamicVisuals.bridgeMesh = bridgeMesh;
+
+            const p1 = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 8), mats.stone);
+            p1.position.set(40, -0.6, 0);
+            scene.add(p1);
+            spatialGrid.addBox(40, 0, 2, 8, 4, -0.6, 'pier_1');
+
+            const p2 = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 8), mats.stone);
+            p2.position.set(60, -0.6, 0);
+            scene.add(p2);
+            spatialGrid.addBox(60, 0, 2, 8, 4, -0.6, 'pier_2');
+        }
+        buildRiverSystem();
+
+        // 5.5 Quest 3: Blacksmith Blast Furnace & Bellows (X: 85, Z: 45)
+        function buildBlacksmithForge(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const shop = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 10), mats.stone);
+            shop.position.y = 3;
+            shop.castShadow = true;
+            group.add(shop);
+            spatialGrid.addBox(x, z, 12, 10, 6, 3, 'forge_shop');
+
+            // Furnace Stack
+            const furnace = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.2, 12, 12), mats.darkWood);
+            furnace.position.set(4, 6, -2);
+            group.add(furnace);
+            spatialGrid.addCylinder(x + 4, z - 2, 3.2, 12, 6, 'furnace_stack');
+
+            // Molten Trough to River
+            const trough = new THREE.Mesh(
+                new THREE.BoxGeometry(32, 0.8, 1.6),
+                new THREE.MeshLambertMaterial({ color: 0x64748b })
+            );
+            trough.position.set(-18, 0.4, -20);
+            trough.rotation.y = Math.PI / 4;
+            group.add(trough);
+
+            scene.add(group);
+
+            interactables.push({
+                id: 'interact_forge',
+                name: 'Blast Furnace & Air Bellows',
+                position: new THREE.Vector3(x + 4, 1, z - 2),
+                radius: 4.8,
+                action: 'open_rig',
+                apparatusKey: 'forge'
+            });
+        }
+        buildBlacksmithForge(85, 45);
+
+        // 5.6 Quest 4: Substation Transformer & Smoking Power Lines (X: 15, Z: -45)
+        function buildSubstation(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const transformerCore = new THREE.Mesh(new THREE.BoxGeometry(5.5, 4.5, 5.5), mats.stone);
+            transformerCore.position.y = 2.25;
+            group.add(transformerCore);
+            spatialGrid.addBox(x, z, 5.5, 5.5, 4.5, 2.25, 'transformer_station');
+
+            // Power line spanning to festival area
+            const cableGeo = new THREE.CylinderGeometry(0.18, 0.18, 38, 8);
+            const cableMat = new THREE.MeshBasicMaterial({ color: 0xef4444 }); // Glowing red hot
+            const cable = new THREE.Mesh(cableGeo, cableMat);
+            cable.rotation.z = Math.PI / 2;
+            cable.position.set(16, 7.5, 0);
+            group.add(cable);
+            dynamicVisuals.powerCables.push(cable);
+
+            // Paper Lanterns on posts
+            [[-15, -10], [0, -15], [15, -10], [30, -15]].forEach(([lx, lz]) => {
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 6, 8), mats.darkWood);
+                pole.position.set(lx, 3, lz);
+                group.add(pole);
+
+                const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 8), mats.lanternRed);
+                lantern.position.set(lx, 5.8, lz);
+                group.add(lantern);
+                dynamicVisuals.lanterns.push(lantern);
+            });
+
+            scene.add(group);
+
+            interactables.push({
+                id: 'interact_grid',
+                name: 'High-Voltage Transformer Core',
+                position: new THREE.Vector3(x, 1, z),
+                radius: 4.8,
+                action: 'open_rig',
+                apparatusKey: 'grid'
+            });
+        }
+        buildSubstation(15, -45);
+
+        // 5.7 Quest 5: Radioactive Onsen / Hot Spring (X: 0, Z: 110)
+        function buildRadioactiveOnsen(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const rim = new THREE.Mesh(new THREE.CylinderGeometry(11, 12, 1.4, 20), mats.stone);
+            rim.position.y = 0.7;
+            group.add(rim);
+            spatialGrid.addCylinder(x, z, 11, 1.8, 0.7, 'onsen_rim');
+
+            // Contaminated Pool (initially toxic murky yellowish green)
+            const poolMat = new THREE.MeshLambertMaterial({ color: 0x84cc16, transparent: true, opacity: 0.85 });
+            const pool = new THREE.Mesh(new THREE.CylinderGeometry(10.2, 10.2, 0.6, 20), poolMat);
+            pool.position.y = 0.9;
+            group.add(pool);
+            dynamicVisuals.springWater = pool;
+
+            // Radiation Leaking Beam Pipes (Alpha, Beta, Gamma)
+            const bGeo = new THREE.CylinderGeometry(0.3, 0.3, 8, 8);
+            const aB = new THREE.Mesh(bGeo, new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.8 }));
+            aB.rotation.z = Math.PI / 2;
+            aB.position.set(-5, 2.5, -3);
+            group.add(aB);
+            dynamicVisuals.radBeams.a = aB;
+
+            const bB = new THREE.Mesh(bGeo, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8 }));
+            bB.rotation.z = Math.PI / 2;
+            bB.position.set(-5, 2.5, 0);
+            group.add(bB);
+            dynamicVisuals.radBeams.b = bB;
+
+            const gB = new THREE.Mesh(bGeo, new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.85 }));
+            gB.rotation.z = Math.PI / 2;
+            gB.position.set(-5, 2.5, 3);
+            group.add(gB);
+            dynamicVisuals.radBeams.g = gB;
+
+            scene.add(group);
+
+            interactables.push({
+                id: 'interact_rad',
+                name: 'Onsen Multi-Beam Radiation Test Pipe',
+                position: new THREE.Vector3(x - 5, 1, z),
+                radius: 5.0,
+                action: 'open_rig',
+                apparatusKey: 'rad'
+            });
+        }
+        buildRadioactiveOnsen(0, 110);
+
+        /* ==========================================================================
+           6. REACTIVE VILLAGE NPCS
+           ========================================================================== */
+        function createChibiNPC(x, z, name, role, bodyColor, emoji) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 1.4, 12), new THREE.MeshLambertMaterial({ color: bodyColor }));
+            body.position.y = 1.1;
+            body.castShadow = true;
+            group.add(body);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 16), new THREE.MeshLambertMaterial({ color: 0xffedd5 }));
+            head.position.y = 2.35;
+            head.castShadow = true;
+            group.add(head);
+
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+            const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), eyeMat);
+            e1.position.set(-0.25, 2.4, 0.62);
+            group.add(e1);
+            const e2 = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), eyeMat);
+            e2.position.set(0.25, 2.4, 0.62);
+            group.add(e2);
+
+            const hat = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.85, 8), new THREE.MeshLambertMaterial({ color: bodyColor }));
+            hat.position.y = 3.1;
+            group.add(hat);
+
+            const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.9, 8), new THREE.MeshLambertMaterial({ color: bodyColor }));
+            arm.position.set(0.75, 1.4, 0);
+            group.add(arm);
+
+            scene.add(group);
+            spatialGrid.addCylinder(x, z, 1.0, 4, 1.8, 'npc_' + name);
+
+            const npcData = { name, role, emoji, group, arm, pos: new THREE.Vector3(x, 0, z) };
+            dynamicVisuals.npcs.push(npcData);
+            return npcData;
+        }
+
+        createChibiNPC(-52, -62, 'Master Kenji', 'Dojo Master', 0xa855f7, '🥋');
+        createChibiNPC(-100, 38, 'Botanist Aoi', 'Herbalist', 0x4ade80, '🌸');
+        createChibiNPC(78, 38, 'Blacksmith Ren', 'Iron Crafter', 0xf97316, '⚒️');
+        createChibiNPC(24, -38, 'Chef Hana', 'Ramen Chef', 0xf43f5e, '🍜');
+        createChibiNPC(-8, 98, 'Villager Pomi', 'Onsen Caretaker', 0x38bdf8, '🐾');
+
+        /* ==========================================================================
+           7. HARVESTABLE SCIENCE ITEMS
+           ========================================================================== */
+        const harvestables = [];
+
+        function spawnSciencePickup(itemDef, pos, colorHex) {
+            const group = new THREE.Group();
+            group.position.copy(pos);
+
+            const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.7), new THREE.MeshLambertMaterial({ color: colorHex }));
+            mesh.position.y = 0.85;
+            mesh.castShadow = true;
+            group.add(mesh);
+
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.08, 8, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 }));
+            ring.rotation.x = Math.PI / 2;
+            ring.position.y = 0.85;
+            group.add(ring);
+
+            scene.add(group);
+
+            const rec = { item: itemDef, group, mesh, ring, collected: false };
+            harvestables.push(rec);
+
+            interactables.push({
+                id: 'harvest_' + Math.random().toString(36).substr(2, 6),
+                name: `Collect ${itemDef.name}`,
+                position: pos,
+                radius: 3.5,
+                action: 'pickup_item',
+                pickupRef: rec
+            });
+        }
+
+        // Ch 3
+        spawnSciencePickup(ITEMS.HYDROGEN_CAN, new THREE.Vector3(-90, 0, 60), 0xf97316);
+        spawnSciencePickup(ITEMS.HYDROGEN_CAN, new THREE.Vector3(-120, 0, 25), 0xf97316);
+        spawnSciencePickup(ITEMS.OXYGEN_TANK, new THREE.Vector3(-98, 0, 30), 0x38bdf8);
+
+        // Ch 4
+        spawnSciencePickup(ITEMS.HEMATITE_ORE, new THREE.Vector3(70, 0, 60), 0xea580c);
+        spawnSciencePickup(ITEMS.COKE_CARBON, new THREE.Vector3(100, 0, 50), 0x475569);
+
+        // Ch 8
+        spawnSciencePickup(ITEMS.PAPER_SHEET, new THREE.Vector3(-14, 0, 95), 0xf8fafc);
+        spawnSciencePickup(ITEMS.ALU_PLATE, new THREE.Vector3(14, 0, 95), 0xcbd5e1);
+        spawnSciencePickup(ITEMS.LEAD_BLOCK, new THREE.Vector3(0, 0, 125), 0x334155);
+
+        /* ==========================================================================
+           8. ADORABLE 3D CHIBI NINJA (WITH SCARF & CARRIED ITEMS)
+           ========================================================================== */
+        const playerGroup = new THREE.Group();
+        playerGroup.position.set(0, 0, 12);
+
+        const suitMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+        const skinMat = new THREE.MeshLambertMaterial({ color: 0xffedd5 });
+        const scarfMat = new THREE.MeshLambertMaterial({ color: 0xf472b6 });
+
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 1.4, 12), suitMat);
+        torso.position.y = 1.25;
+        torso.castShadow = true;
+        playerGroup.add(torso);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), skinMat);
+        head.position.y = 2.45;
+        head.castShadow = true;
+        playerGroup.add(head);
+
+        const headband = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.3, 16), scarfMat);
+        headband.position.y = 2.65;
+        playerGroup.add(headband);
+
+        const ribbon1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.9, 0.08), scarfMat);
+        ribbon1.position.set(0.25, 2.4, -0.85);
+        ribbon1.rotation.x = 0.3;
+        playerGroup.add(ribbon1);
+
+        const ribbon2 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.2, 0.08), scarfMat);
+        ribbon2.position.set(-0.25, 2.3, -0.88);
+        ribbon2.rotation.x = 0.4;
+        playerGroup.add(ribbon2);
+
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+        const eL = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), eyeMat);
+        eL.position.set(-0.28, 2.45, 0.72);
+        playerGroup.add(eL);
+        const eR = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), eyeMat);
+        eR.position.set(0.28, 2.45, 0.72);
+        playerGroup.add(eR);
+
+        const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.9, 8), suitMat);
+        armL.position.set(-0.75, 1.3, 0);
+        playerGroup.add(armL);
+        const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.9, 8), suitMat);
+        armR.position.set(0.75, 1.3, 0);
+        playerGroup.add(armR);
+
+        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 8), suitMat);
+        legL.position.set(-0.32, 0.45, 0);
+        playerGroup.add(legL);
+        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 8), suitMat);
+        legR.position.set(0.32, 0.45, 0);
+        playerGroup.add(legR);
+
+        const carriedAnchor = new THREE.Group();
+        carriedAnchor.position.set(0, 3.6, 0);
+        playerGroup.add(carriedAnchor);
+
+        scene.add(playerGroup);
+
+        /* ==========================================================================
+           9. INPUT & CAMERA ORBIT SYSTEM
+           ========================================================================== */
+        const inputState = { forward: 0, backward: 0, left: 0, right: 0, sprint: false };
+        const camState = { radius: 13, theta: Math.PI / 2, phi: Math.PI / 3.2, isDrag: false, px: 0, py: 0 };
+
+        window.addEventListener('keydown', (e) => {
+            if (gameState.modalOpen) return;
+            switch(e.code) {
+                case 'KeyW': case 'ArrowUp': inputState.forward = 1; break;
+                case 'KeyS': case 'ArrowDown': inputState.backward = 1; break;
+                case 'KeyA': case 'ArrowLeft': inputState.left = 1; break;
+                case 'KeyD': case 'ArrowRight': inputState.right = 1; break;
+                case 'ShiftLeft': case 'ShiftRight': inputState.sprint = true; break;
+                case 'Space': triggerJump(); break;
+                case 'KeyE': triggerInteract(); break;
+                case 'Digit1': selectSlot(0); break;
+                case 'Digit2': selectSlot(1); break;
+                case 'Digit3': selectSlot(2); break;
+                case 'Digit4': selectSlot(3); break;
+                case 'Digit5': selectSlot(4); break;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            switch(e.code) {
+                case 'KeyW': case 'ArrowUp': inputState.forward = 0; break;
+                case 'KeyS': case 'ArrowDown': inputState.backward = 0; break;
+                case 'KeyA': case 'ArrowLeft': inputState.left = 0; break;
+                case 'KeyD': case 'ArrowRight': inputState.right = 0; break;
+                case 'ShiftLeft': case 'ShiftRight': inputState.sprint = false; break;
+            }
+        });
+
+        function triggerJump() {
+            if (gameState.player.isGrounded) {
+                gameState.player.jumpVel = 0.32;
+                gameState.player.isGrounded = false;
+                SoundFX.playChime(587.33, 'triangle', 0.1, 0.15);
+            }
+        }
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.tagName !== 'BUTTON' && !gameState.modalOpen) {
+                camState.isDrag = true;
+                camState.px = e.clientX;
+                camState.py = e.clientY;
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!camState.isDrag) return;
+            const dx = e.clientX - camState.px;
+            const dy = e.clientY - camState.py;
+            camState.theta -= dx * 0.006;
+            camState.phi = Math.max(0.2, Math.min(Math.PI / 2.2, camState.phi - dy * 0.006));
+            camState.px = e.clientX;
+            camState.py = e.clientY;
+        });
+
+        window.addEventListener('mouseup', () => camState.isDrag = false);
+
+        // Mobile Virtual Joystick
+        const joyBase = document.getElementById('joystick-base');
+        const joyThumb = document.getElementById('joystick-thumb');
+        let touchId = null;
+        let joyOrigin = { x: 0, y: 0 };
+
+        if (joyBase) {
+            joyBase.addEventListener('touchstart', (e) => {
+                const t = e.changedTouches[0];
+                touchId = t.identifier;
+                const r = joyBase.getBoundingClientRect();
+                joyOrigin = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                updateJoy(t.clientX, t.clientY);
+            }, { passive: false });
+
+            window.addEventListener('touchmove', (e) => {
+                if (touchId === null) return;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === touchId) {
+                        updateJoy(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            const endJoy = (e) => {
+                if (touchId === null) return;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === touchId) {
+                        touchId = null;
+                        joyThumb.style.transform = 'translate(0, 0)';
+                        inputState.forward = 0; inputState.backward = 0;
+                        inputState.left = 0; inputState.right = 0;
+                        break;
+                    }
+                }
+            };
+            window.addEventListener('touchend', endJoy);
+            window.addEventListener('touchcancel', endJoy);
+        }
+
+        function updateJoy(cx, cy) {
+            const dx = cx - joyOrigin.x;
+            const dy = cy - joyOrigin.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            const maxR = 36;
+            const cl = Math.min(d, maxR);
+            const ang = Math.atan2(dy, dx);
+            const kx = Math.cos(ang) * cl;
+            const ky = Math.sin(ang) * cl;
+
+            joyThumb.style.transform = `translate(${kx}px, ${ky}px)`;
+            inputState.forward = ky < -8 ? -ky / maxR : 0;
+            inputState.backward = ky > 8 ? ky / maxR : 0;
+            inputState.left = kx < -8 ? -kx / maxR : 0;
+            inputState.right = kx > 8 ? kx / maxR : 0;
+        }
+
+        document.getElementById('btn-mobile-jump').addEventListener('click', triggerJump);
+        document.getElementById('btn-mobile-dash').addEventListener('click', () => {
+            inputState.sprint = !inputState.sprint;
+        });
+        document.getElementById('btn-mobile-act').addEventListener('click', triggerInteract);
+
+        /* ==========================================================================
+           10. INVENTORY SYSTEM & PROPS
+           ========================================================================= */
+        function selectSlot(idx) {
+            gameState.player.selectedSlot = idx;
+            document.querySelectorAll('.pastel-slot').forEach((s, i) => {
+                if (i === idx) s.classList.add('selected');
+                else s.classList.remove('selected');
+            });
+            updateCarriedProp();
+            updateHeldItemUI();
+            SoundFX.playChime(659.25, 'sine', 0.05, 0.08);
+        }
+
+        function addToInventory(item) {
+            for (let i = 0; i < gameState.player.inventory.length; i++) {
+                if (gameState.player.inventory[i] === null) {
+                    gameState.player.inventory[i] = item;
+                    renderHotbarUI();
+                    selectSlot(i);
+                    return true;
+                }
+            }
+            showToast("Ninja pouch is full!", "🎒");
+            return false;
+        }
+
+        function removeFromInventory(slotIdx) {
+            gameState.player.inventory[slotIdx] = null;
+            renderHotbarUI();
+            updateCarriedProp();
+            updateHeldItemUI();
+        }
+
+        function renderHotbarUI() {
+            const slots = document.querySelectorAll('.pastel-slot');
+            slots.forEach((el, idx) => {
+                const item = gameState.player.inventory[idx];
+                const icon = el.querySelector('.slot-icon');
+                const qty = el.querySelector('.slot-qty');
+                if (item) {
+                    icon.innerHTML = `<i data-lucide="${item.icon}" class="w-6 h-6" style="color:${item.color}"></i>`;
+                    qty.innerText = "1";
+                } else {
+                    icon.innerHTML = `<i data-lucide="circle-dashed" class="w-5 h-5 text-pink-200"></i>`;
+                    qty.innerText = "0";
+                }
+            });
+            lucide.createIcons();
+        }
+
+        function updateCarriedProp() {
+            while (carriedAnchor.children.length > 0) carriedAnchor.remove(carriedAnchor.children[0]);
+            const cur = gameState.player.inventory[gameState.player.selectedSlot];
+            if (!cur) return;
+
+            const pMesh = new THREE.Mesh(
+                new THREE.DodecahedronGeometry(0.55),
+                new THREE.MeshLambertMaterial({ color: cur.color })
+            );
+            carriedAnchor.add(pMesh);
+        }
+
+        function updateHeldItemUI() {
+            const held = gameState.player.inventory[gameState.player.selectedSlot];
+            const lbl = document.getElementById('held-item-label');
+            if (held) {
+                lbl.innerHTML = `<span class="w-3 h-3 rounded-full" style="background:${held.color}"></span> Holding: <b class="text-pink-900">${held.name}</b> <span class="text-[10px] text-pink-500 font-bold">(${held.chapter})</span>`;
+            } else {
+                lbl.innerHTML = `<span>Hands: Empty (Select 1-5)</span>`;
+            }
+        }
+
+        document.querySelectorAll('.pastel-slot').forEach((s, idx) => {
+            s.addEventListener('click', () => selectSlot(idx));
+        });
+
+        /* ==========================================================================
+           11. RADAR MINIMAP & NAVIGATION
+           ========================================================================== */
+        const radarCanvas = document.getElementById('radar-canvas');
+        const radarCtx = radarCanvas.getContext('2d');
+
+        function renderMinimap() {
+            const w = radarCanvas.width;
+            const h = radarCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+
+            radarCtx.clearRect(0, 0, w, h);
+
+            radarCtx.strokeStyle = 'rgba(244, 114, 182, 0.35)';
+            radarCtx.lineWidth = 1;
+            radarCtx.beginPath();
+            radarCtx.arc(cx, cy, 18, 0, Math.PI * 2);
+            radarCtx.arc(cx, cy, 34, 0, Math.PI * 2);
+            radarCtx.stroke();
+
+            const scale = 0.28;
+
+            // Quest markers
+            gameState.quests.forEach(q => {
+                const rx = cx + (q.pos.x - playerGroup.position.x) * scale;
+                const rz = cy + (q.pos.z - playerGroup.position.z) * scale;
+                const d = Math.hypot(rx - cx, rz - cy);
+                const maxR = cx - 5;
+                let dx = rx, dy = rz;
+                if (d > maxR) {
+                    const a = Math.atan2(rz - cy, rx - cx);
+                    dx = cx + Math.cos(a) * maxR;
+                    dy = cy + Math.sin(a) * maxR;
+                }
+                radarCtx.fillStyle = q.solved ? '#22c55e' : '#f43f5e';
+                radarCtx.beginPath();
+                radarCtx.arc(dx, dy, q.solved ? 3 : 4, 0, Math.PI * 2);
+                radarCtx.fill();
+            });
+
+            // Player Marker
+            radarCtx.fillStyle = '#db2777';
+            radarCtx.beginPath();
+            radarCtx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+            radarCtx.fill();
+
+            radarCtx.strokeStyle = '#ec4899';
+            radarCtx.lineWidth = 2;
+            radarCtx.beginPath();
+            radarCtx.moveTo(cx, cy);
+            radarCtx.lineTo(
+                cx + Math.sin(playerGroup.rotation.y) * 8,
+                cy + Math.cos(playerGroup.rotation.y) * 8
+            );
+            radarCtx.stroke();
+
+            document.getElementById('coords-text').innerText =
+                `X: ${Math.round(playerGroup.position.x)} | Z: ${Math.round(playerGroup.position.z)}`;
+        }
+
+        /* ==========================================================================
+           12. DIRECT EXPERIENTIAL APPARATUS RIGS
+           ========================================================================== */
+        const rigModal = document.getElementById('rig-modal');
+        const rigIconBox = document.getElementById('rig-icon-box');
+        const rigTitle = document.getElementById('rig-title');
+        const rigSubtitle = document.getElementById('rig-subtitle');
+        const rigCanvasContainer = document.getElementById('rig-canvas-container');
+        const rigControlsArea = document.getElementById('rig-controls-area');
+        const rigFeedback = document.getElementById('rig-feedback');
+        const rigActionBtn = document.getElementById('rig-action-btn');
+
+        function triggerInteract() {
+            const it = gameState.activeInteractable;
+            if (!it) return;
+
+            if (it.action === 'pickup_item') {
+                const added = addToInventory(it.pickupRef.item);
+                if (added) {
+                    it.pickupRef.collected = true;
+                    scene.remove(it.pickupRef.group);
+                    SoundFX.playHarvest();
+                    showToast(`Picked up: ${it.pickupRef.item.name}!`, "✨");
+                }
+            } else if (it.action === 'open_rig') {
+                openApparatusRig(it.apparatusKey);
+            }
+        }
+
+        function openApparatusRig(key) {
+            gameState.modalOpen = true;
+            rigFeedback.classList.add('hidden');
+            rigModal.classList.remove('hidden');
+            SoundFX.playChime(659.25, 'sine', 0.1, 0.12);
+
+            switch(key) {
+                case 'optics': renderOpticsRig(); break;
+                case 'water': renderWaterRig(); break;
+                case 'forge': renderForgeRig(); break;
+                case 'grid': renderGridRig(); break;
+                case 'rad': renderRadRig(); break;
+            }
+            lucide.createIcons();
+        }
+
+        function closeApparatusRig() {
+            rigModal.classList.add('hidden');
+            gameState.modalOpen = false;
+        }
+        document.getElementById('btn-close-rig').addEventListener('click', closeApparatusRig);
+
+        // --- RIG 1: REAL-TIME OPTICAL LENS & PUPIL APERTURE RIG ---
+        function renderOpticsRig() {
+            rigIconBox.innerText = "🔭";
+            rigTitle.innerText = "Tactile Optics: Lens Accommodation & Pupil Reflex";
+            rigSubtitle.innerText = "Form 3 Chapter 1: Real-time Refraction on Yellow Spot Sensor";
+
+            const st = gameState.tactileState.optics;
+
+            rigCanvasContainer.innerHTML = `
+                <div class="relative w-full h-44 bg-slate-900 rounded-2xl overflow-hidden border-2 border-purple-300 flex items-center justify-center">
+                    <canvas id="optic-sim-canvas" width="560" height="176" class="w-full h-full block"></canvas>
+                    <div id="optic-view-status" class="absolute top-2 left-3 bg-purple-900/80 px-2.5 py-1 rounded-full text-[11px] font-bold text-purple-200">
+                        Image Blur: 85% (Focal point mismatch)
+                    </div>
+                </div>
+            `;
+
+            rigControlsArea.innerHTML = `
+                <div class="space-y-4 p-4 bg-purple-50 rounded-2xl border-2 border-purple-200">
+                    <div>
+                        <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                            <span>LENS THICKNESS (Ciliary Muscle Tension)</span>
+                            <span id="txt-lens-thick" class="font-mono text-purple-700">${st.lensThickness} px (Target: 55 px)</span>
+                        </div>
+                        <input type="range" id="slider-lens-thick" min="15" max="85" value="${st.lensThickness}" class="w-full accent-purple-600">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                            <span>IRIS APERTURE (Pupil Dial Exposure)</span>
+                            <span id="txt-iris-aperture" class="font-mono text-purple-700">${st.apertureSize}% (Target: 45%)</span>
+                        </div>
+                        <input type="range" id="slider-iris-aperture" min="20" max="100" value="${st.apertureSize}" class="w-full accent-purple-600">
+                    </div>
+                </div>
+            `;
+
+            const sCanvas = document.getElementById('optic-sim-canvas');
+            const sCtx = sCanvas.getContext('2d');
+
+            function drawOpticSimulation() {
+                const w = sCanvas.width;
+                const h = sCanvas.height;
+                sCtx.clearRect(0, 0, w, h);
+
+                // Optical Axis Line
+                sCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                sCtx.setLineDash([4, 4]);
+                sCtx.beginPath();
+                sCtx.moveTo(20, h/2);
+                sCtx.lineTo(w - 20, h/2);
+                sCtx.stroke();
+                sCtx.setLineDash([]);
+
+                // Target Mountain Silhouette
+                sCtx.fillStyle = '#64748b';
+                sCtx.beginPath();
+                sCtx.moveTo(30, h/2 - 35);
+                sCtx.lineTo(50, h/2 + 35);
+                sCtx.lineTo(10, h/2 + 35);
+                sCtx.fill();
+
+                // Mechanical Aperture Blades
+                const apW = (st.apertureSize / 100) * 45;
+                sCtx.fillStyle = '#475569';
+                sCtx.fillRect(180, 0, 16, h/2 - apW);
+                sCtx.fillRect(180, h/2 + apW, 16, h/2 - apW);
+
+                // Physical Dynamic Biconvex Glass Lens
+                const thick = st.lensThickness * 0.45;
+                sCtx.fillStyle = 'rgba(168, 85, 247, 0.45)';
+                sCtx.strokeStyle = '#c084fc';
+                sCtx.lineWidth = 3;
+                sCtx.beginPath();
+                sCtx.arc(280 - thick, h/2, 60, -Math.PI/3, Math.PI/3);
+                sCtx.arc(280 + thick, h/2, 60, 2*Math.PI/3, 4*Math.PI/3);
+                sCtx.closePath();
+                sCtx.fill();
+                sCtx.stroke();
+
+                // Yellow Spot Sensor (Retina / Fovea centralis)
+                const sensorX = 490;
+                sCtx.fillStyle = '#facc15';
+                sCtx.fillRect(sensorX, h/2 - 28, 12, 56);
+
+                // Dynamically Refracted Light Rays
+                // Focal length formula based on thickness
+                const focalLength = 120 + (85 - st.lensThickness) * 3.4;
+                const convergenceX = 280 + focalLength;
+
+                sCtx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+                sCtx.lineWidth = 2.5;
+
+                // 3 Light Rays
+                [-25, 0, 25].forEach(offsetY => {
+                    sCtx.beginPath();
+                    sCtx.moveTo(40, h/2 + offsetY);
+                    sCtx.lineTo(280, h/2 + offsetY * 0.85);
+                    sCtx.lineTo(convergenceX, h/2);
+                    sCtx.lineTo(sensorX + 10, h/2 - (sensorX - convergenceX) * 0.35);
+                    sCtx.stroke();
+                });
+
+                // Check convergence error
+                const distError = Math.abs(convergenceX - sensorX);
+                const apError = Math.abs(st.apertureSize - 45);
+
+                const statusTag = document.getElementById('optic-view-status');
+                if (distError < 12 && apError < 12) {
+                    statusTag.className = "absolute top-2 left-3 bg-emerald-600 px-3 py-1 rounded-full text-[11px] font-bold text-white animate-pulse";
+                    statusTag.innerText = "✨ PERFECT CONVERGENCE ON RETINA (YELLOW SPOT)!";
+                    st.focused = true;
+                } else {
+                    statusTag.className = "absolute top-2 left-3 bg-purple-900/80 px-2.5 py-1 rounded-full text-[11px] font-bold text-purple-200";
+                    statusTag.innerText = `Blur: ${Math.round(distError + apError)}% (Rays not converging on Fovea)`;
+                    st.focused = false;
+                }
+            }
+
+            drawOpticSimulation();
+
+            const sLens = document.getElementById('slider-lens-thick');
+            const sIris = document.getElementById('slider-iris-aperture');
+
+            sLens.oninput = (e) => {
+                st.lensThickness = parseInt(e.target.value);
+                document.getElementById('txt-lens-thick').innerText = `${st.lensThickness} px (Target: 55 px)`;
+                drawOpticSimulation();
+            };
+
+            sIris.oninput = (e) => {
+                st.apertureSize = parseInt(e.target.value);
+                document.getElementById('txt-iris-aperture').innerText = `${st.apertureSize}% (Target: 45%)`;
+                drawOpticSimulation();
+            };
+
+            rigActionBtn.innerText = "Fire Focused Beacon Beam";
+            rigActionBtn.onclick = () => {
+                if (st.focused) {
+                    completeQuest(0);
+                    SoundFX.playBeaconBeam();
+                    dynamicVisuals.beaconBeam.material.opacity = 1.0;
+                    dynamicVisuals.beaconBeam.material.color.setHex(0xfacc15);
+                    showRigFeedback("Convergence Achieved! High-intensity optical beam cleared the valley fog!", true);
+                    setTimeout(closeApparatusRig, 1600);
+                } else {
+                    showRigFeedback("The image is blurry! Tune lens thickness to 55 px and aperture to 45%.", false);
+                }
+            };
+        }
+
+        // --- RIG 2: WATER SYNTHESIS HOPPER & SPARK MAGNETO CRANK ---
+        function renderWaterRig() {
+            rigIconBox.innerText = "💧";
+            rigTitle.innerText = "Tactile Chemical Synthesis: 2H₂ + O₂ → 2H₂O";
+            rigSubtitle.innerText = "Form 3 Chapter 3: Crank Magneto to Spark & Fill Bamboo Aqueduct";
+
+            const st = gameState.tactileState.water;
+
+            rigCanvasContainer.innerHTML = `
+                <div class="p-4 bg-sky-50 rounded-2xl border-2 border-sky-200 flex flex-col items-center">
+                    <div class="flex items-center justify-around w-full mb-3">
+                        <div class="p-3 bg-white rounded-xl border border-sky-200 flex flex-col items-center">
+                            <span class="text-xs font-bold text-orange-600">Hydrogen Gas (H₂)</span>
+                            <span id="disp-h2" class="text-2xl font-bold font-num text-slate-800 my-1">${st.h2Count} / 2</span>
+                            <button id="btn-feed-h2" class="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition">
+                                Drop H₂ Canister
+                            </button>
+                        </div>
+                        <div class="p-3 bg-white rounded-xl border border-sky-200 flex flex-col items-center">
+                            <span class="text-xs font-bold text-sky-600">Oxygen Gas (O₂)</span>
+                            <span id="disp-o2" class="text-2xl font-bold font-num text-slate-800 my-1">${st.o2Count} / 1</span>
+                            <button id="btn-feed-o2" class="px-3 py-1 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-xs font-bold transition">
+                                Drop O₂ Canister
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            rigControlsArea.innerHTML = `
+                <div class="p-4 bg-white rounded-2xl border-2 border-pink-200 flex flex-col items-center">
+                    <span class="text-xs font-bold text-pink-700 mb-2">MAGNETO SPARK CRANK (Click rapidly to generate ignition spark!)</span>
+                    <button id="btn-crank-magneto" class="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-400 to-rose-400 border-4 border-white text-white font-bubble font-bold text-sm shadow-xl active:scale-90 flex flex-col items-center justify-center transition">
+                        <i data-lucide="rotate-cw" class="w-8 h-8 mb-1"></i>
+                        <span>CRANK!</span>
+                    </button>
+                    <div class="w-full bg-pink-100 h-3.5 rounded-full overflow-hidden mt-3 border border-pink-300 p-0.5">
+                        <div id="spark-progress-bar" class="h-full bg-gradient-to-r from-amber-400 to-rose-500 rounded-full transition-all" style="width: ${st.sparkCount * 20}%;"></div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-feed-h2').onclick = () => {
+                const held = gameState.player.inventory[gameState.player.selectedSlot];
+                if (held && held.id === 'HYDROGEN_CAN' && st.h2Count < 2) {
+                    st.h2Count++;
+                    removeFromInventory(gameState.player.selectedSlot);
+                    SoundFX.playHarvest();
+                    document.getElementById('disp-h2').innerText = `${st.h2Count} / 2`;
+                } else showRigFeedback("Equip a pink Hydrogen canister (H₂) from your pouch!", false);
+            };
+
+            document.getElementById('btn-feed-o2').onclick = () => {
+                const held = gameState.player.inventory[gameState.player.selectedSlot];
+                if (held && held.id === 'OXYGEN_TANK' && st.o2Count < 1) {
+                    st.o2Count++;
+                    removeFromInventory(gameState.player.selectedSlot);
+                    SoundFX.playHarvest();
+                    document.getElementById('disp-o2').innerText = `${st.o2Count} / 1`;
+                } else showRigFeedback("Equip a blue Oxygen tank (O₂) from your pouch!", false);
+            };
+
+            document.getElementById('btn-crank-magneto').onclick = () => {
+                SoundFX.playSparkIgnition();
+                st.sparkCount = Math.min(5, st.sparkCount + 1);
+                document.getElementById('spark-progress-bar').style.width = `${st.sparkCount * 20}%`;
+                if (st.sparkCount >= 5) {
+                    if (st.h2Count >= 2 && st.o2Count >= 1) {
+                        completeQuest(1);
+                        SoundFX.playWaterRush();
+                        dynamicVisuals.riverWater.scale.set(1, 1, 1);
+                        dynamicVisuals.waterwheelSpinning = true;
+                        showRigFeedback("WHOOSH! 2H₂ + O₂ → 2H₂O Synthesized! Aqueduct rushes, spinning the waterwheel!", true);
+                        setTimeout(closeApparatusRig, 1600);
+                    } else {
+                        showRigFeedback("Spark fired, but stoichiometry is unbalanced! Need exactly 2 H₂ and 1 O₂.", false);
+                        st.sparkCount = 0;
+                        document.getElementById('spark-progress-bar').style.width = '0%';
+                    }
+                }
+            };
+
+            rigActionBtn.innerText = "Close Hopper";
+            rigActionBtn.onclick = closeApparatusRig;
+        }
+
+        // --- RIG 3: BLAST FURNACE REDUCTION & BELLOWS PUMP ---
+        function renderForgeRig() {
+            rigIconBox.innerText = "⚒️";
+            rigTitle.innerText = "Tactile Blast Furnace Reduction & Casting";
+            rigSubtitle.innerText = "Form 3 Chapter 4 & 5: Pump Bellows to Smelt 2Fe₂O₃ + 3C → 4Fe + 3CO₂↑";
+
+            const st = gameState.tactileState.forge;
+
+            rigCanvasContainer.innerHTML = `
+                <div class="p-4 bg-orange-50 rounded-2xl border-2 border-orange-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="flex space-x-2">
+                            <button id="btn-load-hem" class="px-3 py-1.5 ${st.hematiteLoaded ? 'bg-emerald-600 text-white' : 'bg-orange-600 text-white'} rounded-xl text-xs font-bold">
+                                ${st.hematiteLoaded ? 'Hematite Loaded ✓' : 'Load Hematite Ore'}
+                            </button>
+                            <button id="btn-load-coke" class="px-3 py-1.5 ${st.carbonLoaded ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-white'} rounded-xl text-xs font-bold">
+                                ${st.carbonLoaded ? 'Carbon Loaded ✓' : 'Load Coke / Carbon'}
+                            </button>
+                        </div>
+                        <span id="disp-temp" class="text-xs font-bold font-num text-orange-800">Temp: ${st.temp} °C</span>
+                    </div>
+                    <div class="w-full bg-orange-200 h-4 rounded-full overflow-hidden p-0.5 border border-orange-300">
+                        <div id="furnace-temp-bar" class="h-full bg-gradient-to-r from-orange-400 via-amber-400 to-rose-600 rounded-full transition-all" style="width: ${(st.temp - 400) / 11}%;"></div>
+                    </div>
+                </div>
+            `;
+
+            rigControlsArea.innerHTML = `
+                <div class="p-4 bg-white rounded-2xl border-2 border-orange-200 flex flex-col items-center">
+                    <span class="text-xs font-bold text-orange-800 mb-2">AIR BLAST BELLOWS (Pump to supply oxygen and raise heat!)</span>
+                    <button id="btn-pump-bellows" class="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 border-4 border-white text-white font-bubble font-bold text-sm shadow-xl active:scale-90 flex flex-col items-center justify-center transition">
+                        <i data-lucide="wind" class="w-8 h-8 mb-1"></i>
+                        <span>PUMP!</span>
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('btn-load-hem').onclick = () => {
+                const held = gameState.player.inventory[gameState.player.selectedSlot];
+                if (held && held.id === 'HEMATITE_ORE') {
+                    st.hematiteLoaded = true;
+                    removeFromInventory(gameState.player.selectedSlot);
+                    SoundFX.playHarvest();
+                    renderForgeRig();
+                } else showRigFeedback("Equip red Hematite Ore (Fe₂O₃) from your pouch!", false);
+            };
+
+            document.getElementById('btn-load-coke').onclick = () => {
+                const held = gameState.player.inventory[gameState.player.selectedSlot];
+                if (held && held.id === 'COKE_CARBON') {
+                    st.carbonLoaded = true;
+                    removeFromInventory(gameState.player.selectedSlot);
+                    SoundFX.playHarvest();
+                    renderForgeRig();
+                } else showRigFeedback("Equip black Coke / Carbon (C) from your pouch!", false);
+            };
+
+            document.getElementById('btn-pump-bellows').onclick = () => {
+                SoundFX.playBellowsPump();
+                st.bellowsPumps++;
+                st.temp = Math.min(1500, st.temp + 140);
+                document.getElementById('disp-temp').innerText = `Temp: ${st.temp} °C`;
+                document.getElementById('furnace-temp-bar').style.width = `${(st.temp - 400) / 11}%`;
+
+                if (st.temp >= 1400) {
+                    if (st.hematiteLoaded && st.carbonLoaded) {
+                        completeQuest(2);
+                        dynamicVisuals.bridgeMesh.material.opacity = 1.0;
+                        spatialGrid.addBox(50, 0, 18, 7, 1.2, 0.6, 'solid_iron_bridge');
+                        showRigFeedback("Incandescent Heat Reached! Molten cast iron poured into molds, assembling the bridge!", true);
+                        setTimeout(closeApparatusRig, 1600);
+                    } else {
+                        showRigFeedback("Furnace is hot, but missing reactants! Load both Hematite and Carbon.", false);
+                    }
+                }
+            };
+
+            rigActionBtn.innerText = "Close Forge";
+            rigActionBtn.onclick = closeApparatusRig;
+        }
+
+        // --- RIG 4: TRANSFORMER COIL WINDER & P = I²R HEAT LOSS ---
+        function renderGridRig() {
+            rigIconBox.innerText = "⚡";
+            rigTitle.innerText = "Tactile Transformer Calibration (P_loss = I²R)";
+            rigSubtitle.innerText = "Form 3 Chapter 6: Wind Secondary Turns to Step Up Voltage & Drop Current";
+
+            const st = gameState.tactileState.grid;
+
+            rigCanvasContainer.innerHTML = `
+                <div class="p-4 bg-amber-50 rounded-2xl border-2 border-amber-200">
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div class="p-3 bg-white rounded-xl border border-amber-200 flex flex-col items-center">
+                            <span class="text-xs font-bold text-slate-500">TRANSMISSION VOLTAGE</span>
+                            <span id="disp-volts" class="text-2xl font-bold font-num text-amber-700 my-1">${st.voltageKV} kV</span>
+                            <span class="text-[10px] text-slate-400">Step-Up Target: 132 kV</span>
+                        </div>
+                        <div class="p-3 bg-white rounded-xl border border-amber-200 flex flex-col items-center">
+                            <span class="text-xs font-bold text-slate-500">CURRENT (I)</span>
+                            <span id="disp-amps" class="text-2xl font-bold font-num ${st.currentAmps > 20 ? 'text-rose-600 animate-pulse' : 'text-emerald-600'} my-1">${st.currentAmps} A</span>
+                            <span class="text-[10px] text-slate-400">Heat Loss: P = I²R</span>
+                        </div>
+                    </div>
+                    <div class="p-2.5 bg-slate-900 rounded-xl text-center">
+                        <span id="disp-cable-status" class="text-xs font-bold ${st.lineCool ? 'text-emerald-400' : 'text-rose-400'}">
+                            ${st.lineCool ? 'POWER LINE STATUS: COOL CYAN & SAFE' : 'POWER LINE STATUS: GLOWING CHERRY-RED & SMOKING!'}
+                        </span>
+                    </div>
+                </div>
+            `;
+
+            rigControlsArea.innerHTML = `
+                <div class="p-4 bg-white rounded-2xl border-2 border-amber-200 space-y-3">
+                    <div class="flex justify-between items-center text-xs font-bold text-slate-700">
+                        <span>SECONDARY COIL TURNS (Ns)</span>
+                        <span id="disp-turns" class="font-mono text-amber-700">${st.secondaryTurns} Turns (Target: 12)</span>
+                    </div>
+                    <input type="range" id="slider-sec-turns" min="1" max="12" value="${st.secondaryTurns}" class="w-full accent-amber-500">
+                </div>
+            `;
+
+            const sTurns = document.getElementById('slider-sec-turns');
+            sTurns.oninput = (e) => {
+                st.secondaryTurns = parseInt(e.target.value);
+                st.voltageKV = 11 + (st.secondaryTurns - 1) * 11;
+                st.currentAmps = Math.round(180 / st.secondaryTurns);
+                st.lineCool = (st.secondaryTurns >= 12);
+
+                document.getElementById('disp-turns').innerText = `${st.secondaryTurns} Turns (Target: 12)`;
+                document.getElementById('disp-volts').innerText = `${st.voltageKV} kV`;
+                document.getElementById('disp-amps').innerText = `${st.currentAmps} A`;
+
+                const cStatus = document.getElementById('disp-cable-status');
+                if (st.lineCool) {
+                    cStatus.className = "text-xs font-bold text-emerald-400";
+                    cStatus.innerText = "POWER LINE STATUS: COOL CYAN & SAFE (P_loss ~ 0)";
+                } else {
+                    cStatus.className = "text-xs font-bold text-rose-400";
+                    cStatus.innerText = "POWER LINE STATUS: GLOWING CHERRY-RED & SMOKING!";
+                }
+                SoundFX.playTransformerHum();
+            };
+
+            rigActionBtn.innerText = "Energize Substation Grid";
+            rigActionBtn.onclick = () => {
+                if (st.lineCool) {
+                    completeQuest(3);
+                    dynamicVisuals.powerCables.forEach(c => c.material.color.setHex(0x38bdf8));
+                    dynamicVisuals.lanterns.forEach(l => {
+                        l.material.emissive.setHex(0xfbbf24);
+                        l.material.emissiveIntensity = 1.0;
+                    });
+                    showRigFeedback("High Voltage 132kV Online! Current dropped to 15A, lines cooled, lanterns lit!", true);
+                    setTimeout(closeApparatusRig, 1600);
+                } else {
+                    showRigFeedback("Current is still too high! Wind secondary turns to maximum (12) to Step-Up voltage.", false);
+                }
+            };
+        }
+
+        // --- RIG 5: ONEN RADIATION PENETRATION SHIELDING TEST ---
+        function renderRadRig() {
+            rigIconBox.innerText = "☢️";
+            rigTitle.innerText = "Tactile Radiation Penetration Test";
+            rigSubtitle.innerText = "Form 3 Chapter 8: Experimentally Slot Paper, Aluminium, & Lead";
+
+            const st = gameState.tactileState.rad;
+
+            rigCanvasContainer.innerHTML = `
+                <div class="space-y-2.5 p-4 bg-sky-50 rounded-2xl border-2 border-sky-200">
+                    <div class="p-3 bg-white rounded-xl border border-sky-200 flex justify-between items-center">
+                        <div>
+                            <span class="text-xs font-bold text-amber-600">BEAM 1: ALPHA (α) RAY</span>
+                            <p class="text-[10px] text-slate-400">High Ionizing Power, Low Penetration</p>
+                        </div>
+                        <button id="btn-slot-alpha" class="px-3 py-1.5 rounded-xl text-xs font-bold ${st.alphaSlot ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}">
+                            ${st.alphaSlot ? 'Paper Inserted ✓' : 'Insert Barrier from Hands'}
+                        </button>
+                    </div>
+                    <div class="p-3 bg-white rounded-xl border border-sky-200 flex justify-between items-center">
+                        <div>
+                            <span class="text-xs font-bold text-sky-600">BEAM 2: BETA (β) RAY</span>
+                            <p class="text-[10px] text-slate-400">High Speed Electrons</p>
+                        </div>
+                        <button id="btn-slot-beta" class="px-3 py-1.5 rounded-xl text-xs font-bold ${st.betaSlot ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}">
+                            ${st.betaSlot ? 'Aluminium Inserted ✓' : 'Insert Barrier from Hands'}
+                        </button>
+                    </div>
+                    <div class="p-3 bg-white rounded-xl border border-sky-200 flex justify-between items-center">
+                        <div>
+                            <span class="text-xs font-bold text-purple-600">BEAM 3: GAMMA (γ) RAY</span>
+                            <p class="text-[10px] text-slate-400">Electromagnetic Penetrating Waves</p>
+                        </div>
+                        <button id="btn-slot-gamma" class="px-3 py-1.5 rounded-xl text-xs font-bold ${st.gammaSlot ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}">
+                            ${st.gammaSlot ? 'Lead Inserted ✓' : 'Insert Barrier from Hands'}
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            rigControlsArea.innerHTML = ``;
+
+            document.getElementById('btn-slot-alpha').onclick = () => {
+                const held = gameState.player.inventory[gameState.player.selectedSlot];
+                if (held && held.id === 'PAPER_SHEET') {
+                    st.alphaSlot = true;
+                    removeFromInventory(gameState.player.selectedSlot);
+                    SoundFX.playHarvest();
+                    dynamicVisuals.radBeams.a.visible = false;
+                    renderRadRig();
+                } else showRigFeedback("Alpha rays have low penetration and are stopped by thin Washi Paper!", false);
+            };
+
+            document.getElementById('btn-slot-beta').onclick = () => {
+                const held = gameState.player.inventory[gameState.player.selectedSlot];
+                if (held && held.id === 'ALU_PLATE') {
+                    st.betaSlot = true;
+                    removeFromInventory(gameState.player.selectedSlot);
+                    SoundFX.playHarvest();
+                    dynamicVisuals.radBeams.b.visible = false;
+                    renderRadRig();
+                } else showRigFeedback("Beta particles pass through paper! They require a 5mm Aluminium plate.", false);
+            };
+
+            document.getElementById('btn-slot-gamma').onclick = () => {
+                const held = gameState.player.inventory[gameState.player.selectedSlot];
+                if (held && held.id === 'LEAD_BLOCK') {
+                    st.gammaSlot = true;
+                    removeFromInventory(gameState.player.selectedSlot);
+                    SoundFX.playHarvest();
+                    dynamicVisuals.radBeams.g.visible = false;
+                    renderRadRig();
+                } else showRigFeedback("Gamma electromagnetic rays punch through paper & aluminium! Need dense Lead.", false);
+            };
+
+            rigActionBtn.innerText = "Check Onsen Purification";
+            rigActionBtn.onclick = () => {
+                if (st.alphaSlot && st.betaSlot && st.gammaSlot) {
+                    completeQuest(4);
+                    dynamicVisuals.springWater.material.color.setHex(0x2dd4bf); // Sparkling turquoise
+                    showRigFeedback("All 3 ionizing beams blocked! Onsen cleansed into healing turquoise spring!", true);
+                    setTimeout(closeApparatusRig, 1600);
+                } else {
+                    showRigFeedback("Radiation still detected! Ensure Paper for Alpha, Aluminium for Beta, Lead for Gamma.", false);
+                }
+            };
+        }
+
+        function showRigFeedback(msg, isSuccess) {
+            rigFeedback.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-800', 'border-emerald-300', 'bg-rose-100', 'text-rose-800', 'border-rose-300');
+            if (isSuccess) rigFeedback.classList.add('bg-emerald-100', 'text-emerald-800', 'border-emerald-300');
+            else rigFeedback.classList.add('bg-rose-100', 'text-rose-800', 'border-rose-300');
+            rigFeedback.innerText = msg;
+        }
+
+        /* ==========================================================================
+           13. QUEST PROGRESSION & VILLAGE HARMONY
+           ========================================================================== */
+        function completeQuest(idx) {
+            if (gameState.quests[idx].solved) return;
+            gameState.quests[idx].solved = true;
+            SoundFX.playFanfare();
+            showToast(`EXPERIENTIAL PROTOCOL RESOLVED: ${gameState.quests[idx].title}`, "🌸");
+
+            updateQuestHUD();
+        }
+
+        function updateQuestHUD() {
+            const unsolvedIdx = gameState.quests.findIndex(q => !q.solved);
+            const count = gameState.quests.filter(q => q.solved).length;
+            const harmony = Math.round((count / gameState.quests.length) * 100);
+
+            document.getElementById('harmony-bar').style.width = `${harmony}%`;
+            document.getElementById('harmony-text').innerText = `Village Harmony: ${harmony}%`;
+
+            if (unsolvedIdx === -1) {
+                document.getElementById('quest-chapter-badge').innerText = "MASTER";
+                document.getElementById('quest-title').innerText = "🌸 SAKURA SCIENCE VILLAGE SAVED!";
+                document.getElementById('quest-desc').innerText = "Incredible work! You have applied practical science to bring prosperity to the entire village!";
+                document.getElementById('quest-nav-target').innerText = "Harmony: 100% 🏆";
+                showToast("CHIBI NINJA SCIENCE MASTER! Village Harmonized!", "🌟");
+            } else {
+                const cur = gameState.quests[unsolvedIdx];
+                gameState.currentQuestIndex = unsolvedIdx;
+                document.getElementById('quest-chapter-badge').innerText = cur.chapter;
+                document.getElementById('quest-title').innerText = cur.title;
+                document.getElementById('quest-desc').innerText = cur.desc;
+                document.getElementById('quest-nav-target').innerText = cur.nav;
+            }
+        }
+
+        function showToast(title, icon = "🌸") {
+            const b = document.getElementById('banner-notification');
+            document.getElementById('banner-title').innerText = title;
+            document.getElementById('banner-icon').innerText = icon;
+            b.classList.remove('-translate-y-28', 'opacity-0');
+            b.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                b.classList.remove('translate-y-0', 'opacity-100');
+                b.classList.add('-translate-y-28', 'opacity-0');
+            }, 3200);
+        }
+
+        const cModal = document.getElementById('codex-modal');
+        document.getElementById('btn-codex').onclick = () => cModal.classList.remove('hidden');
+        document.getElementById('btn-close-codex').onclick = () => cModal.classList.add('hidden');
+
+        document.getElementById('btn-sound').onclick = () => {
+            SoundFX.muted = !SoundFX.muted;
+            document.getElementById('sound-icon').setAttribute('data-lucide', SoundFX.muted ? 'volume-x' : 'volume-2');
+            document.getElementById('sound-label').innerText = SoundFX.muted ? 'Audio OFF' : 'Audio ON';
+            lucide.createIcons();
+        };
+
+        /* ==========================================================================
+           14. AMBIENT UPDATES & PROXIMITY CHECK
+           ========================================================================== */
+        let geigerTickTimer = 0;
+
+        function checkEnvironmentalAmbience(delta) {
+            // Radiation clicks near Onsen
+            const onsenDist = playerGroup.position.distanceTo(new THREE.Vector3(0, 0, 110));
+            if (onsenDist < 26 && !gameState.quests[4].solved) {
+                geigerTickTimer += delta;
+                if (geigerTickTimer > 0.28) {
+                    SoundFX.playGeigerClick();
+                    geigerTickTimer = 0;
+                }
+            }
+
+            // Waterwheel rotation
+            if (dynamicVisuals.waterwheelSpinning && dynamicVisuals.waterwheelMesh) {
+                dynamicVisuals.waterwheelMesh.rotation.x += 0.04;
+            }
+
+            // Falling Sakura Petals
+            dynamicVisuals.petals.forEach(p => {
+                p.position.y -= 0.04;
+                p.position.x += Math.sin(p.position.y) * 0.02;
+                p.rotation.x += 0.01;
+                p.rotation.y += 0.015;
+                if (p.position.y < 0.2) p.position.y = 18;
+            });
+
+            // NPCs head look & arm waving
+            dynamicVisuals.npcs.forEach(n => {
+                const dist = playerGroup.position.distanceTo(n.pos);
+                if (dist < 12) {
+                    const ang = Math.atan2(playerGroup.position.x - n.pos.x, playerGroup.position.z - n.pos.z);
+                    n.group.rotation.y = ang;
+                    n.arm.rotation.x = Math.sin(clock.oldTime * 0.008) * 0.6 - 0.4;
+                } else {
+                    n.arm.rotation.x = 0;
+                }
+            });
+        }
+
+        function checkProximityInteractions() {
+            let nearest = null;
+            let minDist = 999;
+            const px = playerGroup.position.x;
+            const pz = playerGroup.position.z;
+
+            for (let i = 0; i < interactables.length; i++) {
+                const it = interactables[i];
+                if (it.pickupRef && it.pickupRef.collected) continue;
+                const d = Math.hypot(px - it.position.x, pz - it.position.z);
+                if (d < it.radius && d < minDist) {
+                    minDist = d;
+                    nearest = it;
+                }
+            }
+
+            gameState.activeInteractable = nearest;
+            const prompt = document.getElementById('action-prompt');
+            if (nearest && !gameState.modalOpen) {
+                prompt.classList.remove('hidden');
+                prompt.classList.add('flex');
+                document.getElementById('action-prompt-label').innerText = nearest.name;
+                document.getElementById('action-key-tag').innerText = (nearest.action === 'pickup_item') ? 'E : COLLECT' : 'E : OPERATE';
+            } else {
+                prompt.classList.add('hidden');
+                prompt.classList.remove('flex');
+            }
+        }
+
+        /* ==========================================================================
+           15. 60 FPS MAIN GAME ENGINE LOOP (Zero GC Allocations)
+           ========================================================================== */
+        const clock = new THREE.Clock();
+        let accumulator = 0;
+        const FIXED_DT = 1 / 60;
+        let frames = 0;
+        let lastFps = 0;
+        let stepCooldown = 0;
+
+        function physicsUpdate() {
+            if (gameState.modalOpen) return;
+
+            const moveZ = (inputState.backward - inputState.forward);
+            const moveX = (inputState.right - inputState.left);
+
+            if (moveZ !== 0 || moveX !== 0) {
+                const moveAngle = Math.atan2(moveX, moveZ);
+                const finalAngle = moveAngle + camState.theta;
+                const spd = gameState.player.speed * (inputState.sprint ? gameState.player.sprintMult : 1.0);
+
+                const dispX = Math.sin(finalAngle) * spd;
+                const dispZ = Math.cos(finalAngle) * spd;
+
+                resolvePlayerSlide(playerGroup.position, dispX, dispZ, gameState.player.radius, 2.5);
+
+                playerGroup.rotation.y = THREE.MathUtils.lerp(playerGroup.rotation.y, finalAngle, 0.22);
+
+                const animFreq = inputState.sprint ? 20 : 12;
+                const time = clock.oldTime * 0.001;
+
+                // Waddle animation
+                legL.rotation.x = Math.sin(time * animFreq) * 0.65;
+                legR.rotation.x = -Math.sin(time * animFreq) * 0.65;
+                armL.rotation.x = -Math.sin(time * animFreq) * 0.55;
+                armR.rotation.x = Math.sin(time * animFreq) * 0.55;
+                torso.position.y = 1.25 + Math.sin(time * animFreq) * 0.1;
+                head.position.y = 2.45 + Math.sin(time * animFreq) * 0.1;
+
+                ribbon1.rotation.x = 0.5 + Math.sin(time * animFreq) * 0.35;
+                ribbon2.rotation.x = 0.6 + Math.cos(time * animFreq) * 0.4;
+
+                stepCooldown -= FIXED_DT;
+                if (stepCooldown <= 0) {
+                    SoundFX.playStep();
+                    stepCooldown = inputState.sprint ? 0.2 : 0.32;
+                }
+            } else {
+                legL.rotation.x = THREE.MathUtils.lerp(legL.rotation.x, 0, 0.2);
+                legR.rotation.x = THREE.MathUtils.lerp(legR.rotation.x, 0, 0.2);
+                armL.rotation.x = THREE.MathUtils.lerp(armL.rotation.x, 0, 0.2);
+                armR.rotation.x = THREE.MathUtils.lerp(armR.rotation.x, 0, 0.2);
+                torso.position.y = 1.25;
+                head.position.y = 2.45;
+                ribbon1.rotation.x = 0.2;
+                ribbon2.rotation.x = 0.3;
+            }
+
+            if (!gameState.player.isGrounded) {
+                playerGroup.position.y += gameState.player.jumpVel;
+                gameState.player.jumpVel -= gameState.player.gravity;
+                if (playerGroup.position.y <= 0) {
+                    playerGroup.position.y = 0;
+                    gameState.player.jumpVel = 0;
+                    gameState.player.isGrounded = true;
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const rawDelta = clock.getDelta();
+            const dt = Math.min(rawDelta, 0.1);
+            const time = clock.getElapsedTime();
+
+            accumulator += dt;
+            let substeps = 0;
+            while (accumulator >= FIXED_DT && substeps < 3) {
+                physicsUpdate();
+                accumulator -= FIXED_DT;
+                substeps++;
+            }
+
+            // FPS Counter
+            frames++;
+            if (performance.now() - lastFps >= 500) {
+                const fps = Math.round((frames * 1000) / (performance.now() - lastFps));
+                document.getElementById('fps-badge').innerText = `${fps} FPS`;
+                frames = 0;
+                lastFps = performance.now();
+            }
+
+            // Camera Tracking
+            const tx = playerGroup.position.x;
+            const ty = playerGroup.position.y + 1.8;
+            const tz = playerGroup.position.z;
+
+            const cx = tx + camState.radius * Math.sin(camState.phi) * Math.sin(camState.theta);
+            const cy = ty + camState.radius * Math.cos(camState.phi);
+            const cz = tz + camState.radius * Math.sin(camState.phi) * Math.cos(camState.theta);
+
+            camera.position.x += (cx - camera.position.x) * 0.12;
+            camera.position.y += (cy - camera.position.y) * 0.12;
+            camera.position.z += (cz - camera.position.z) * 0.12;
+            camera.lookAt(tx, ty, tz);
+
+            // Floating collectibles
+            for (let i = 0; i < harvestables.length; i++) {
+                const h = harvestables[i];
+                if (!h.collected) {
+                    h.mesh.rotation.y += 0.025;
+                    h.mesh.position.y = 0.85 + Math.sin(time * 3 + i) * 0.12;
+                    h.ring.rotation.z += 0.015;
+                }
+            }
+
+            checkEnvironmentalAmbience(dt);
+            renderMinimap();
+            checkProximityInteractions();
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = function() {
+            lucide.createIcons();
+            renderHotbarUI();
+            updateHeldItemUI();
+            updateQuestHUD();
+            animate();
+        };
+    </script>
+</body>
+</html>
