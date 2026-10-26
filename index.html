@@ -1,0 +1,2382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Omniverse: The Science Protocol - Syllabus Odyssey (60 FPS Edition)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=VT323&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #020617;
+            font-family: 'Rajdhani', sans-serif;
+        }
+        canvas#webgl {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            outline: none;
+            display: block;
+        }
+        .font-hud { font-family: 'Orbitron', sans-serif; }
+        .font-retro { font-family: 'VT323', monospace; }
+
+        .glass-hud {
+            background: rgba(10, 18, 36, 0.88);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 189, 248, 0.28);
+            box-shadow: 0 10px 38px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .item-slot {
+            transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .item-slot.selected {
+            border-color: #38bdf8;
+            box-shadow: 0 0 18px rgba(56, 189, 248, 0.8);
+            transform: translateY(-3px) scale(1.06);
+            background: rgba(14, 116, 144, 0.55);
+        }
+
+        /* Virtual joystick styling */
+        .joystick-outer {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.75);
+            border: 2px solid rgba(56, 189, 248, 0.45);
+            position: relative;
+            touch-action: none;
+        }
+        .joystick-inner {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%);
+            box-shadow: 0 0 16px #38bdf8;
+            position: absolute;
+            top: 33px;
+            left: 33px;
+            pointer-events: none;
+            transform: translate(0, 0);
+        }
+
+        #radar-canvas {
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, rgba(2, 6, 23, 0.96) 80%);
+            border: 2px solid rgba(56, 189, 248, 0.45);
+            box-shadow: 0 0 18px rgba(14, 165, 233, 0.3);
+        }
+
+        #rad-overlay, #heat-overlay, #storm-overlay {
+            pointer-events: none;
+            transition: opacity 0.2s ease-out;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.4); border-radius: 3px; }
+    </style>
+</head>
+<body class="text-slate-100 select-none overflow-hidden">
+    <!-- WebGL Canvas -->
+    <canvas id="webgl"></canvas>
+
+    <!-- Hazard Screen Overlays -->
+    <div id="rad-overlay" class="absolute inset-0 bg-emerald-500/0 z-10 pointer-events-none mix-blend-screen transition-opacity"></div>
+    <div id="heat-overlay" class="absolute inset-0 bg-amber-600/0 z-10 pointer-events-none mix-blend-color-dodge transition-opacity"></div>
+    <div id="storm-overlay" class="absolute inset-0 bg-purple-600/0 z-10 pointer-events-none mix-blend-screen transition-opacity"></div>
+
+    <!-- TOP HUD: Vitals, Biome, Minimap & Nav -->
+    <div class="absolute top-3 left-3 right-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 z-20 pointer-events-none">
+        <!-- Player Bio-Suit Dashboard -->
+        <div class="glass-hud rounded-2xl px-5 py-3 pointer-events-auto flex items-center space-x-4 border-l-4 border-cyan-400">
+            <div class="relative">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-600 to-indigo-900 flex items-center justify-center font-bold text-xl border border-cyan-300/40 shadow-inner">
+                    <i data-lucide="shield" class="w-6 h-6 text-cyan-200"></i>
+                </div>
+                <div class="absolute -bottom-1 -right-1 bg-cyan-400 text-slate-950 font-black text-[10px] px-1.5 py-0.5 rounded-full font-hud">
+                    60FPS
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="font-hud font-bold text-xs tracking-wider text-cyan-300">BIO-PROTOCOL SUIT</span>
+                    <span id="current-biome-badge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-950 text-cyan-300 border border-cyan-500/30">
+                        CENTRAL CROSSROADS
+                    </span>
+                </div>
+                <div class="w-44 md:w-56 bg-slate-900/90 h-2.5 rounded-full overflow-hidden mt-1.5 border border-slate-700 p-0.5">
+                    <div id="suit-health-bar" class="h-full bg-gradient-to-r from-emerald-500 via-cyan-400 to-blue-500 rounded-full transition-all duration-200" style="width: 100%;"></div>
+                </div>
+                <div class="flex justify-between text-[11px] text-slate-400 font-semibold mt-1">
+                    <span id="environmental-hazard-text" class="text-emerald-400 flex items-center gap-1">
+                        <i data-lucide="shield-check" class="w-3 h-3"></i> Environment: Stable
+                    </span>
+                    <span id="fps-display-text" class="text-cyan-300 font-mono text-[10px]">60 FPS</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Radar Minimap & Utility Buttons -->
+        <div class="pointer-events-auto flex items-center space-x-3">
+            <div class="glass-hud p-2 rounded-2xl flex flex-col items-center">
+                <canvas id="radar-canvas" width="92" height="92"></canvas>
+                <div class="text-[10px] font-mono font-bold text-cyan-400 mt-1">
+                    <span id="player-coords-hud">X: 0 | Z: 0</span>
+                </div>
+            </div>
+
+            <div class="flex flex-col space-y-1.5">
+                <button id="btn-syllabus-codex" class="glass-hud px-3.5 py-2 rounded-xl flex items-center space-x-2 text-xs font-semibold hover:border-cyan-400 transition transform hover:-translate-y-0.5 active:scale-95 text-cyan-200">
+                    <i data-lucide="book-marked" class="w-4 h-4 text-cyan-400"></i>
+                    <span>Syllabus Codex</span>
+                </button>
+                <button id="btn-quest-log" class="glass-hud px-3.5 py-2 rounded-xl flex items-center space-x-2 text-xs font-semibold hover:border-amber-400 transition transform hover:-translate-y-0.5 active:scale-95 text-amber-200">
+                    <i data-lucide="list-checks" class="w-4 h-4 text-amber-400"></i>
+                    <span id="quest-tracker-btn-text">Mission Log (0/8)</span>
+                </button>
+                <button id="btn-sound-toggle" class="glass-hud px-3.5 py-1.5 rounded-xl text-cyan-200 hover:border-cyan-400 transition flex items-center justify-center space-x-1.5 text-xs">
+                    <i data-lucide="volume-2" id="sound-icon" class="w-3.5 h-3.5"></i>
+                    <span id="sound-status-label">Audio ON</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIVE EXPEDITION DIRECTIVE HUD (Top Right) -->
+    <div class="absolute top-28 right-3 w-80 md:w-96 glass-hud rounded-2xl p-4 pointer-events-auto z-20 border-r-4 border-cyan-400">
+        <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-slate-700/60">
+            <span class="text-[11px] uppercase font-extrabold tracking-widest text-cyan-400 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                ACTIVE DIRECTIVE
+            </span>
+            <span id="active-chapter-tag" class="text-[10px] font-mono font-bold bg-cyan-950 px-2 py-0.5 rounded text-cyan-300 border border-cyan-500/40">
+                CH. 1
+            </span>
+        </div>
+        <div>
+            <h3 id="current-quest-title" class="font-hud font-black text-sm text-white flex items-center gap-1.5">
+                <i data-lucide="eye" class="w-4 h-4 text-cyan-400"></i> 1. Neural Sensor Optical Alignment
+            </h3>
+            <p id="current-quest-desc" class="text-xs text-slate-300 mt-1 leading-relaxed">
+                Calibrate optical lenses & aperture at the Animus Sensor Tower to focus light sharply onto the Yellow Spot (Fovea) of the retina.
+            </p>
+            <div class="mt-2.5 p-2 rounded-lg bg-slate-900/90 border border-cyan-500/20 flex items-center justify-between text-xs">
+                <span class="text-slate-400 flex items-center gap-1">
+                    <i data-lucide="navigation" class="w-3.5 h-3.5 text-cyan-400"></i> Station Nav:
+                </span>
+                <span id="current-quest-nav" class="text-emerald-300 font-bold font-hud">Animus Neural Tower [0, -165]</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Traversal Boost Display -->
+    <div class="absolute bottom-28 left-6 pointer-events-none hidden md:block">
+        <div class="glass-hud px-4 py-2 rounded-xl text-xs font-hud text-slate-300 border-l-4 border-cyan-400 flex items-center space-x-2">
+            <i data-lucide="zap" class="w-4 h-4 text-amber-400 animate-bounce"></i>
+            <span>HOLD <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-white font-mono">SHIFT</kbd> FOR IONIC HOVER-SPRINT</span>
+        </div>
+    </div>
+
+    <!-- INVENTORY & CARRYING BAR (Hotbar) -->
+    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-auto">
+        <div id="held-item-indicator" class="mb-2 text-xs font-bold px-4 py-1.5 rounded-full bg-slate-900/90 border border-cyan-400/40 text-cyan-300 flex items-center gap-2 shadow-lg">
+            <span>Hands: Empty (Select 1-6)</span>
+        </div>
+
+        <div class="glass-hud px-3.5 py-2.5 rounded-2xl flex items-center space-x-2 border border-slate-700/80 shadow-2xl">
+            <!-- 6 Hotbar Slots -->
+            <div class="item-slot w-12 h-12 md:w-14 md:h-14 rounded-xl bg-slate-900/90 border-2 border-slate-700 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="0">
+                <span class="text-[10px] text-slate-500 font-mono absolute top-1 left-1.5">1</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-slate-600"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-cyan-400 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="item-slot w-12 h-12 md:w-14 md:h-14 rounded-xl bg-slate-900/90 border-2 border-slate-700 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="1">
+                <span class="text-[10px] text-slate-500 font-mono absolute top-1 left-1.5">2</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-slate-600"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-cyan-400 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="item-slot w-12 h-12 md:w-14 md:h-14 rounded-xl bg-slate-900/90 border-2 border-slate-700 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="2">
+                <span class="text-[10px] text-slate-500 font-mono absolute top-1 left-1.5">3</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-slate-600"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-cyan-400 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="item-slot w-12 h-12 md:w-14 md:h-14 rounded-xl bg-slate-900/90 border-2 border-slate-700 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="3">
+                <span class="text-[10px] text-slate-500 font-mono absolute top-1 left-1.5">4</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-slate-600"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-cyan-400 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="item-slot w-12 h-12 md:w-14 md:h-14 rounded-xl bg-slate-900/90 border-2 border-slate-700 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="4">
+                <span class="text-[10px] text-slate-500 font-mono absolute top-1 left-1.5">5</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-slate-600"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-cyan-400 absolute bottom-1 right-1.5">0</span>
+            </div>
+            <div class="item-slot w-12 h-12 md:w-14 md:h-14 rounded-xl bg-slate-900/90 border-2 border-slate-700 flex flex-col items-center justify-center cursor-pointer relative group p-1" data-slot="5">
+                <span class="text-[10px] text-slate-500 font-mono absolute top-1 left-1.5">6</span>
+                <span class="slot-icon text-lg"><i data-lucide="circle-dashed" class="w-5 h-5 text-slate-600"></i></span>
+                <span class="slot-qty text-[10px] font-bold text-cyan-400 absolute bottom-1 right-1.5">0</span>
+            </div>
+
+            <!-- Key hints -->
+            <div class="hidden lg:flex flex-col pl-3 border-l border-slate-700 text-[11px] text-slate-400 space-y-1">
+                <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-white font-mono">E</kbd> Interact / Calibrate</span>
+                <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-white font-mono">F</kbd> Use / Socket Item</span>
+                <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-white font-mono">1-6</kbd> Select Active Slot</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Proximity Interaction Tooltip -->
+    <div id="action-prompt" class="absolute bottom-32 left-1/2 -translate-x-1/2 glass-hud px-6 py-3 rounded-full hidden items-center space-x-3 pointer-events-none z-30 border border-cyan-400 shadow-xl shadow-cyan-900/50 animate-bounce">
+        <span class="bg-cyan-500 text-slate-950 font-black px-2.5 py-1 rounded text-xs font-hud" id="action-key-tag">E</span>
+        <span id="action-prompt-label" class="text-sm font-bold text-cyan-100">Interact</span>
+    </div>
+
+    <!-- INTERACTIVE SCIENCE LAB EXPERIMENT APPARATUS MODAL -->
+    <div id="apparatus-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-hud w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 md:p-8 border-2 border-cyan-400/50 relative shadow-2xl">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-700/80">
+                <div class="flex items-center space-x-3">
+                    <div id="apparatus-icon-box" class="w-12 h-12 rounded-xl bg-cyan-950 border border-cyan-400 flex items-center justify-center text-cyan-300">
+                        <i data-lucide="cpu" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h2 id="apparatus-title" class="font-hud text-lg md:text-xl font-black text-cyan-300">Scientific Apparatus</h2>
+                        <p id="apparatus-subtitle" class="text-xs text-slate-400">Calibration Protocol</p>
+                    </div>
+                </div>
+                <button id="btn-close-apparatus" class="text-slate-400 hover:text-white p-2 rounded-lg text-2xl leading-none">&times;</button>
+            </div>
+
+            <div id="apparatus-body" class="my-5"></div>
+
+            <div id="apparatus-feedback" class="hidden p-3 rounded-xl text-xs md:text-sm font-semibold mb-4"></div>
+
+            <div class="flex justify-end space-x-3 pt-2">
+                <button id="apparatus-action-btn" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 font-hud text-xs md:text-sm font-bold text-white transition active:scale-95 shadow-lg shadow-cyan-900/50">
+                    Apply Scientific Calibration
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MISSION LOG OVERVIEW MODAL -->
+    <div id="quest-log-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-hud w-full max-w-3xl max-h-[85vh] rounded-3xl p-6 md:p-8 flex flex-col relative border border-amber-400/40">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-700">
+                <div class="flex items-center space-x-3">
+                    <i data-lucide="clipboard-list" class="w-7 h-7 text-amber-400"></i>
+                    <h2 class="font-hud text-xl md:text-2xl font-black text-amber-300">Omniverse Protocol: 8-Chapter Mission Log</h2>
+                </div>
+                <button id="btn-close-quest-log" class="text-slate-400 hover:text-white text-2xl p-1 rounded-lg">&times;</button>
+            </div>
+            <div id="quest-list-container" class="overflow-y-auto pr-2 mt-4 space-y-3"></div>
+        </div>
+    </div>
+
+    <!-- KSSM FORM 3 FIELD CODEX MODAL -->
+    <div id="codex-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-lg z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-hud w-full max-w-3xl max-h-[85vh] rounded-3xl p-6 md:p-8 flex flex-col relative border border-cyan-400/40">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-700">
+                <div class="flex items-center space-x-3">
+                    <i data-lucide="graduation-cap" class="w-7 h-7 text-cyan-400"></i>
+                    <h2 class="font-hud text-xl md:text-2xl font-black text-cyan-300">KSSM Science Form 3 Syllabus Field Codex</h2>
+                </div>
+                <button id="btn-close-codex" class="text-slate-400 hover:text-white text-2xl p-1 rounded-lg">&times;</button>
+            </div>
+
+            <div class="overflow-y-auto pr-2 mt-4 space-y-4 text-xs md:text-sm text-slate-300">
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-cyan-500/30">
+                    <h3 class="font-hud text-cyan-400 font-bold text-sm">Chapter 1: Stimuli and Responses (Human Vision)</h3>
+                    <p class="mt-1 text-slate-300 leading-relaxed">
+                        Light rays enter through the cornea, pass through the pupil (controlled by the iris), and are refracted by the biconvex lens to form an inverted, sharp image on the <b>Yellow Spot (Fovea centralis)</b>, which has the highest density of photoreceptors (cones and rods). Ciliary muscles change the curvature of the eye lens to focus near or distant objects.
+                    </p>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-rose-500/30">
+                    <h3 class="font-hud text-rose-400 font-bold text-sm">Chapters 2 & 5: Respiration & Thermochemistry</h3>
+                    <p class="mt-1 text-slate-300 leading-relaxed">
+                        <b>Exothermic reactions</b> release heat to the surroundings (&Delta;H &lt; 0), raising temperature (combustion, runaway thermal cores). <b>Endothermic reactions</b> absorb heat energy from surroundings (&Delta;H &gt; 0), dropping temperature (dissolving Ammonium Nitrate, NH<sub>4</sub>NO<sub>3</sub>, in cold packs). Respiration requires continuous supply of O<sub>2</sub> and removal of CO<sub>2</sub> through alveoli.
+                    </p>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-blue-500/30">
+                    <h3 class="font-hud text-blue-400 font-bold text-sm">Chapter 3: Transportation in Plants & Chemical Synthesis</h3>
+                    <p class="mt-1 text-slate-300 leading-relaxed">
+                        Water synthesized via 2H<sub>2</sub> + O<sub>2</sub> &rarr; 2H<sub>2</sub>O is absorbed by plant roots and transported upwards through <b>xylem vessels</b> via <b>transpiration pull</b>, capillary action, and root pressure. Excess water evaporates through leaf <b>stomata</b>, regulated by guard cells.
+                    </p>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-orange-500/30">
+                    <h3 class="font-hud text-orange-400 font-bold text-sm">Chapter 4: Reactivity Series of Metals & Extraction</h3>
+                    <p class="mt-1 text-slate-300 leading-relaxed">
+                        Metals less reactive than Carbon (such as Iron, Zinc, Lead) are extracted from their ores in a <b>Blast Furnace</b> via reduction by Carbon (Coke) and Carbon Monoxide:
+                        <code>2Fe<sub>2</sub>O<sub>3</sub> + 3C &rarr; 4Fe + 3CO<sub>2</sub>&uarr;</code>. High reactivity metals (K, Na, Ca, Mg, Al) must be extracted by electrolysis.
+                    </p>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-amber-500/30">
+                    <h3 class="font-hud text-amber-400 font-bold text-sm">Chapter 6: Electricity and Magnetism</h3>
+                    <p class="mt-1 text-slate-300 leading-relaxed">
+                        Transmission heat loss is given by P<sub>loss</sub> = I<sup>2</sup>R. Stepping up voltage via a <b>Step-Up Transformer</b> (V<sub>p</sub>/V<sub>s</sub> = N<sub>p</sub>/N<sub>s</sub>, where N<sub>s</sub> &gt; N<sub>p</sub>) to 132 kV reduces current (I), minimizing heat dissipation. At residential zones, a <b>Step-Down Transformer</b> (N<sub>s</sub> &lt; N<sub>p</sub>) drops voltage to safe 240 V.
+                    </p>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-yellow-500/30">
+                    <h3 class="font-hud text-yellow-400 font-bold text-sm">Chapter 7: Energy, Work and Power</h3>
+                    <p class="mt-1 text-slate-300 leading-relaxed">
+                        <b>Work Done (W)</b> = Force (F) &times; Displacement (s) in Joules (J). <b>Gravitational Potential Energy</b>: E<sub>p</sub> = mgh (mass &times; gravity 9.8 m/s<sup>2</sup> &times; height). <b>Kinetic Energy</b>: E<sub>k</sub> = &frac12;mv<sup>2</sup>.
+                    </p>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-emerald-500/30">
+                    <h3 class="font-hud text-emerald-400 font-bold text-sm">Chapter 8: Radioactivity & Shielding</h3>
+                    <p class="mt-1 text-slate-300 leading-relaxed">
+                        <b>Alpha (&alpha;)</b>: High ionizing power, low penetration, stopped by a single <b>sheet of paper</b>. <b>Beta (&beta;)</b>: Moderate penetration, stopped by <b>5mm aluminium sheet</b>. <b>Gamma (&gamma;)</b>: High energy electromagnetic waves, stopped only by thick <b>dense lead (Pb) or concrete</b>.
+                    </p>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-purple-500/30">
+                    <h3 class="font-hud text-purple-400 font-bold text-sm">Chapters 9 & 10: Space Weather & Space Exploration</h3>
+                    <p class="mt-1 text-slate-300 leading-relaxed">
+                        Solar flares and <b>Coronal Mass Ejections (CME)</b> blast streams of charged plasma that trigger geomagnetic storms, disrupting communications and power grids. Planetary geomagnetic shields deflect solar wind. Satellite orbits obey Kepler's laws in elliptical paths.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE TOUCH CONTROLS -->
+    <div class="absolute bottom-5 left-5 z-30 pointer-events-auto md:hidden">
+        <div id="joystick-base" class="joystick-outer">
+            <div id="joystick-handle" class="joystick-inner"></div>
+        </div>
+    </div>
+
+    <div class="absolute bottom-5 right-5 z-30 pointer-events-auto md:hidden flex flex-col space-y-3 items-end">
+        <button id="btn-mobile-sprint" class="w-14 h-14 rounded-2xl bg-amber-600/90 active:bg-amber-500 border-2 border-amber-300 font-hud text-white font-black text-xs flex flex-col items-center justify-center shadow-lg active:scale-95">
+            <i data-lucide="zap" class="w-5 h-5 mb-0.5"></i> DASH
+        </button>
+        <button id="btn-mobile-use" class="w-16 h-16 rounded-2xl bg-cyan-600/90 active:bg-cyan-500 border-2 border-cyan-300 font-hud text-white font-black text-xs flex flex-col items-center justify-center shadow-lg shadow-cyan-900/50 active:scale-95">
+            <i data-lucide="hand" class="w-6 h-6 mb-0.5"></i> ACT
+        </button>
+        <button id="btn-mobile-jump" class="w-14 h-14 rounded-2xl bg-slate-800/90 active:bg-slate-700 border border-slate-600 font-hud text-white font-bold text-xs flex flex-col items-center justify-center active:scale-95">
+            <i data-lucide="arrow-up" class="w-5 h-5"></i> JUMP
+        </button>
+    </div>
+
+    <!-- BANNER TOAST NOTIFICATION -->
+    <div id="banner-notification" class="absolute top-24 left-1/2 -translate-x-1/2 glass-hud px-6 py-3 rounded-2xl border border-cyan-400 shadow-2xl z-40 transform -translate-y-28 opacity-0 transition-all duration-300 pointer-events-none flex items-center space-x-3">
+        <div id="banner-icon-slot" class="text-xl">🏆</div>
+        <div>
+            <h4 id="banner-title" class="font-hud text-xs font-black text-cyan-300">MISSION RESOLVED</h4>
+            <p id="banner-text" class="text-xs font-bold text-slate-100">Science protocol verified!</p>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT GAME ENGINE -->
+    <script>
+        /* ==========================================================================
+           1. COMPREHENSIVE & ROBUST PROCEDURAL AUDIO SYNTHESIZER
+           ========================================================================== */
+        const SoundFX = {
+            ctx: null,
+            muted: false,
+            ambientNodes: {},
+            lastGeiger: 0,
+            activeVoices: 0,
+            maxVoices: 6,
+
+            init() {
+                if (this.ctx) return;
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                } catch(e) {
+                    console.warn("AudioContext init deferred", e);
+                }
+            },
+
+            unlock() {
+                if (!this.ctx) this.init();
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume().then(() => this.startSubDrone());
+                } else if (this.ctx && this.ctx.state === 'running') {
+                    this.startSubDrone();
+                }
+            },
+
+            startSubDrone() {
+                if (!this.ctx || this.ambientNodes.started || this.muted) return;
+                this.ambientNodes.started = true;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(52, this.ctx.currentTime);
+                    g.gain.setValueAtTime(0.02, this.ctx.currentTime);
+                    osc.connect(g);
+                    g.connect(this.ctx.destination);
+                    osc.start();
+                    this.ambientNodes.osc = osc;
+                    this.ambientNodes.gain = g;
+                } catch(e){}
+            },
+
+            playTone(freq, type = 'sine', duration = 0.1, gain = 0.12) {
+                if (this.muted) return;
+                this.unlock();
+                if (!this.ctx || this.ctx.state !== 'running') return;
+                if (this.activeVoices >= this.maxVoices) return;
+
+                this.activeVoices++;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, now);
+                    g.gain.setValueAtTime(gain, now);
+                    g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+                    osc.connect(g);
+                    g.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + duration);
+                    osc.onended = () => { this.activeVoices = Math.max(0, this.activeVoices - 1); };
+                } catch(e) {
+                    this.activeVoices = Math.max(0, this.activeVoices - 1);
+                }
+            },
+
+            playHarvest() {
+                this.playTone(520, 'sine', 0.08, 0.14);
+                setTimeout(() => this.playTone(780, 'sine', 0.11, 0.15), 65);
+            },
+
+            playInstall() {
+                this.playTone(280, 'square', 0.07, 0.09);
+                setTimeout(() => this.playTone(700, 'sine', 0.12, 0.14), 75);
+            },
+
+            playWaterRush() {
+                this.unlock();
+                if (!this.ctx || this.muted || this.ctx.state !== 'running') return;
+                try {
+                    const bufferSize = this.ctx.sampleRate * 1.5;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(260, this.ctx.currentTime);
+                    filter.frequency.exponentialRampToValueAtTime(1400, this.ctx.currentTime + 1.2);
+                    const g = this.ctx.createGain();
+                    g.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 1.5);
+                    noise.connect(filter);
+                    filter.connect(g);
+                    g.connect(this.ctx.destination);
+                    noise.start();
+                } catch(e){}
+            },
+
+            playFurnaceSmelt() {
+                this.playTone(90, 'sawtooth', 1.2, 0.22);
+                setTimeout(() => this.playTone(180, 'sawtooth', 0.8, 0.18), 150);
+            },
+
+            playElectricArc() {
+                this.playTone(110, 'sawtooth', 0.25, 0.2);
+                setTimeout(() => this.playTone(1200, 'triangle', 0.08, 0.18), 75);
+            },
+
+            playGeigerClick() {
+                const now = performance.now();
+                if (now - this.lastGeiger < 70) return; // Rate limiter
+                this.lastGeiger = now;
+                this.playTone(3100 + Math.random() * 500, 'square', 0.015, 0.06);
+            },
+
+            playSolarShieldHum() {
+                this.playTone(320, 'sine', 1.2, 0.18);
+            },
+
+            playSuccessFanfare() {
+                if (this.muted) return;
+                const freqs = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                freqs.forEach((f, idx) => {
+                    setTimeout(() => this.playTone(f, 'triangle', 0.24, 0.18), idx * 95);
+                });
+            }
+        };
+
+        // Attach global audio unlock on any initial interaction
+        ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+            window.addEventListener(evt, () => SoundFX.unlock(), { once: true, passive: true });
+        });
+
+        /* ==========================================================================
+           2. 2D SPATIAL HASH GRID & FIXED-TIMESTEP SLIDING COLLISION SYSTEM (O(1))
+           ========================================================================== */
+        class SpatialCollisionGrid {
+            constructor(cellSize = 24) {
+                this.cellSize = cellSize;
+                this.grid = new Map();
+                this.colliders = []; // Master list
+            }
+
+            _hash(cx, cz) {
+                return `${cx}_${cz}`;
+            }
+
+            addBox(cx, cz, sizeX, sizeZ, height = 20, cy = 0, name = 'box') {
+                const halfX = sizeX / 2;
+                const halfZ = sizeZ / 2;
+                const collider = {
+                    type: 'box',
+                    minX: cx - halfX, maxX: cx + halfX,
+                    minZ: cz - halfZ, maxZ: cz + halfZ,
+                    minY: cy - height / 2, maxY: cy + height / 2,
+                    name
+                };
+                this.colliders.push(collider);
+                this._insertIntoCells(collider, collider.minX, collider.maxX, collider.minZ, collider.maxZ);
+            }
+
+            addCylinder(cx, cz, radius, height = 25, cy = 0, name = 'cylinder') {
+                const collider = {
+                    type: 'cylinder',
+                    x: cx, z: cz, radius,
+                    minY: cy - height / 2, maxY: cy + height / 2,
+                    name
+                };
+                this.colliders.push(collider);
+                this._insertIntoCells(collider, cx - radius, cx + radius, cz - radius, cz + radius);
+            }
+
+            _insertIntoCells(collider, minX, maxX, minZ, maxZ) {
+                const startCellX = Math.floor(minX / this.cellSize);
+                const endCellX = Math.floor(maxX / this.cellSize);
+                const startCellZ = Math.floor(minZ / this.cellSize);
+                const endCellZ = Math.floor(maxZ / this.cellSize);
+
+                for (let x = startCellX; x <= endCellX; x++) {
+                    for (let z = startCellZ; z <= endCellZ; z++) {
+                        const key = this._hash(x, z);
+                        if (!this.grid.has(key)) {
+                            this.grid.set(key, []);
+                        }
+                        this.grid.get(key).push(collider);
+                    }
+                }
+            }
+
+            // Zero-allocation query using static collector
+            queryNear(x, z, radius, outList) {
+                outList.length = 0;
+                const startCellX = Math.floor((x - radius) / this.cellSize);
+                const endCellX = Math.floor((x + radius) / this.cellSize);
+                const startCellZ = Math.floor((z - radius) / this.cellSize);
+                const endCellZ = Math.floor((z + radius) / this.cellSize);
+
+                for (let cx = startCellX; cx <= endCellX; cx++) {
+                    for (let cz = startCellZ; cz <= endCellZ; cz++) {
+                        const list = this.grid.get(this._hash(cx, cz));
+                        if (list) {
+                            for (let i = 0; i < list.length; i++) {
+                                const c = list[i];
+                                if (!outList.includes(c)) outList.push(c);
+                            }
+                        }
+                    }
+                }
+                return outList;
+            }
+        }
+
+        const spatialGrid = new SpatialCollisionGrid(24);
+        const _queryCandidates = [];
+
+        // Swept & Sliding Multi-pass Resolution with static scratch vectors (No GC pressure)
+        function resolvePlayerMovement(pos, dispX, dispZ, playerRadius, playerHeight) {
+            let nextX = pos.x + dispX;
+            let nextZ = pos.z + dispZ;
+            const pY = pos.y;
+
+            // Fetch candidate colliders in O(1)
+            spatialGrid.queryNear(nextX, nextZ, playerRadius + 3, _queryCandidates);
+
+            // Iterate candidate subset
+            for (let i = 0; i < _queryCandidates.length; i++) {
+                const c = _queryCandidates[i];
+                if (pY + playerHeight < c.minY || pY > c.maxY) continue;
+
+                if (c.type === 'cylinder') {
+                    const dx = nextX - c.x;
+                    const dz = nextZ - c.z;
+                    const distSq = dx * dx + dz * dz;
+                    const minDist = c.radius + playerRadius;
+
+                    if (distSq < minDist * minDist) {
+                        const dist = Math.sqrt(distSq);
+                        if (dist > 0.0001) {
+                            nextX = c.x + (dx / dist) * minDist;
+                            nextZ = c.z + (dz / dist) * minDist;
+                        } else {
+                            nextX = c.x + minDist;
+                        }
+                    }
+                } else if (c.type === 'box') {
+                    const closestX = Math.max(c.minX, Math.min(nextX, c.maxX));
+                    const closestZ = Math.max(c.minZ, Math.min(nextZ, c.maxZ));
+
+                    const diffX = nextX - closestX;
+                    const diffZ = nextZ - closestZ;
+                    const distSq = diffX * diffX + diffZ * diffZ;
+
+                    if (nextX >= c.minX && nextX <= c.maxX && nextZ >= c.minZ && nextZ <= c.maxZ) {
+                        const dLeft = Math.abs(nextX - c.minX);
+                        const dRight = Math.abs(c.maxX - nextX);
+                        const dBottom = Math.abs(nextZ - c.minZ);
+                        const dTop = Math.abs(c.maxZ - nextZ);
+                        const minPen = Math.min(dLeft, dRight, dBottom, dTop);
+
+                        if (minPen === dLeft) nextX = c.minX - playerRadius;
+                        else if (minPen === dRight) nextX = c.maxX + playerRadius;
+                        else if (minPen === dBottom) nextZ = c.minZ - playerRadius;
+                        else nextZ = c.maxZ + playerRadius;
+                    } else if (distSq < playerRadius * playerRadius) {
+                        const dist = Math.sqrt(distSq);
+                        if (dist > 0.0001) {
+                            const pen = playerRadius - dist;
+                            nextX += (diffX / dist) * pen;
+                            nextZ += (diffZ / dist) * pen;
+                        }
+                    }
+                }
+            }
+
+            // World boundary clamp
+            const radDist = Math.hypot(nextX, nextZ);
+            if (radDist > 320) {
+                const ratio = 320 / radDist;
+                nextX *= ratio;
+                nextZ *= ratio;
+            }
+
+            pos.x = nextX;
+            pos.z = nextZ;
+        }
+
+        /* ==========================================================================
+           3. INVENTORY ITEMS & SYLLABUS SCIENCE ASSETS
+           ========================================================================== */
+        const INVENTORY_ITEMS = {
+            BICONVEX_LENS: { id: 'BICONVEX_LENS', name: 'Biconvex Eye Lens', icon: 'eye', color: '#38bdf8', chapter: 'Ch. 1' },
+            AMMONIUM_NITRATE: { id: 'AMMONIUM_NITRATE', name: 'Ammonium Nitrate (NH₄NO₃)', icon: 'snowflake', color: '#a5f3fc', chapter: 'Ch. 2 & 5' },
+            HYDROGEN_CAN: { id: 'HYDROGEN_CAN', name: 'Hydrogen Gas (H₂)', icon: 'flame', color: '#f97316', chapter: 'Ch. 3' },
+            OXYGEN_TANK: { id: 'OXYGEN_TANK', name: 'Oxygen Canister (O₂)', icon: 'wind', color: '#38bdf8', chapter: 'Ch. 3' },
+            HEMATITE_ORE: { id: 'HEMATITE_ORE', name: 'Hematite Ore (Fe₂O₃)', icon: 'box', color: '#9a3412', chapter: 'Ch. 4' },
+            COKE_CARBON: { id: 'COKE_CARBON', name: 'Coke / Carbon Block (C)', icon: 'square', color: '#334155', chapter: 'Ch. 4' },
+            STEP_UP_COIL: { id: 'STEP_UP_COIL', name: 'Step-Up Coils (132 kV, Ns>Np)', icon: 'zap', color: '#eab308', chapter: 'Ch. 6' },
+            STEP_DOWN_COIL: { id: 'STEP_DOWN_COIL', name: 'Step-Down Coils (240 V, Ns<Np)', icon: 'battery-charging', color: '#eab308', chapter: 'Ch. 6' },
+            CRANE_COUNTERWEIGHT: { id: 'CRANE_COUNTERWEIGHT', name: 'Crane Counterweight (m=500kg)', icon: 'anchor', color: '#64748b', chapter: 'Ch. 7' },
+            PAPER_SHEET: { id: 'PAPER_SHEET', name: 'Cellulose Shield (Paper / α)', icon: 'file-text', color: '#f8fafc', chapter: 'Ch. 8' },
+            ALU_PLATE: { id: 'ALU_PLATE', name: 'Aluminium Plate 5mm (β)', icon: 'shield', color: '#cbd5e1', chapter: 'Ch. 8' },
+            LEAD_BLOCK: { id: 'LEAD_BLOCK', name: 'Dense Lead Block (Pb / γ)', icon: 'shield-alert', color: '#475569', chapter: 'Ch. 8' },
+            GEOMAGNETIC_COIL: { id: 'GEOMAGNETIC_COIL', name: 'Geomagnetic Deflector Unit', icon: 'sun', color: '#c084fc', chapter: 'Ch. 9 & 10' }
+        };
+
+        const gameState = {
+            player: {
+                health: 100,
+                selectedSlot: 0,
+                inventory: [null, null, null, null, null, null],
+                speed: 0.28,
+                sprintMultiplier: 2.2,
+                isGrounded: true,
+                jumpVel: 0,
+                gravity: 0.016,
+                radius: 0.75
+            },
+            currentQuestIndex: 0,
+            quests: [
+                { id: 'q1_optics', chapter: 'Ch. 1', title: 'Neural Sensor Optical Alignment', desc: 'Calibrate optical lenses & aperture at the Animus Sensor Tower to focus light sharply onto the Yellow Spot (Fovea) of the retina.', coords: 'X: 0, Z: -165', pos: new THREE.Vector3(0, 0, -165), color: '#38bdf8', solved: false },
+                { id: 'q2_thermal', chapter: 'Ch. 2 & 5', title: 'Quench Exothermic Flare Core', desc: 'Deploy endothermic Ammonium Nitrate pouches (ΔH > 0) into the runaway Core to absorb heat and restore life-support scrubbers.', coords: 'X: -140, Z: -60', pos: new THREE.Vector3(-140, 0, -60), color: '#f43f5e', solved: false },
+                { id: 'q3_water', chapter: 'Ch. 3', title: 'Water Synthesis & Transpiration', desc: 'Synthesize 2H₂ + O₂ → 2H₂O in the Catalytic Chamber to refill the reservoir and trigger plant transpiration pull via xylem/stomata.', coords: 'X: -140, Z: 60', pos: new THREE.Vector3(-140, 0, 60), color: '#06b6d4', solved: false },
+                { id: 'q4_smelt', chapter: 'Ch. 4', title: 'Blast Furnace Extraction of Iron', desc: 'Smelt Hematite (Fe₂O₃) with Coke (Carbon) to extract pure Iron (2Fe₂O₃ + 3C → 4Fe + 3CO₂↑) and cast structural bridge beams.', coords: 'X: -150, Z: 0', pos: new THREE.Vector3(-150, 0, 0), color: '#ea580c', solved: false },
+                { id: 'q5_grid', chapter: 'Ch. 6', title: 'Electricity Transmission (P_loss = I²R)', desc: 'Mount Step-Up Transformer (132 kV) at generator to reduce current, and Step-Down Transformer (240 V) at Cyber-Citadel substation.', coords: 'X: 130, Z: -50', pos: new THREE.Vector3(130, 0, -50), color: '#eab308', solved: false },
+                { id: 'q6_work', chapter: 'Ch. 7', title: 'Mechanical Work & Potential Energy', desc: 'Rig counterweights onto high-altitude pulleys (W = F × s, Ep = mgh) to generate mechanical work and lift fortified blast doors.', coords: 'X: 140, Z: 50', pos: new THREE.Vector3(140, 0, 50), color: '#a3e635', solved: false },
+                { id: 'q7_radioactivity', chapter: 'Ch. 8', title: 'Ionizing Fissure Penetration Containment', desc: 'Seal radiation leaks using exact barriers: Paper sheet for Alpha (α), 5mm Aluminium for Beta (β), and dense Lead for Gamma (γ).', coords: 'X: 0, Z: 155', pos: new THREE.Vector3(0, 0, 155), color: '#10b981', solved: false },
+                { id: 'q8_space', chapter: 'Ch. 9 & 10', title: 'Space Weather & CME Deflection', desc: 'Deflect incoming Coronal Mass Ejection plasma using geomagnetic coils and align the Keplerian parabolic satellite dish.', coords: 'X: 0, Z: -50', pos: new THREE.Vector3(0, 0, -50), color: '#c084fc', solved: false }
+            ],
+            puzzleStates: {
+                optics: { lensInstalled: false, focusSlider: 10, apertureSlider: 50 },
+                thermal: { pouchesAdded: 0, temp: 420 },
+                water: { h2: 0, o2: 0 },
+                smelt: { hematite: 0, coke: 0, bridgeBuilt: false },
+                grid: { stepUp: false, stepDown: false },
+                work: { counterweights: 0 },
+                radiation: { alpha: false, beta: false, gamma: false },
+                space: { geomagneticOnline: false, dishAligned: false }
+            },
+            activeInteractable: null,
+            modalOpen: false
+        };
+
+        /* ==========================================================================
+           4. THREE.JS RENDERING ENGINE & BATCHED ENVIRONMENT SETUP
+           ========================================================================== */
+        const canvas = document.getElementById('webgl');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020617);
+        scene.fog = new THREE.FogExp2(0x020617, 0.0035);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({
+            canvas,
+            antialias: true,
+            powerPreference: 'high-performance',
+            stencil: false
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // Optimized Directional Light & Shadow Frustum
+        const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.75);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.15);
+        sunLight.position.set(110, 160, 90);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 1024;
+        sunLight.shadow.mapSize.height = 1024;
+        sunLight.shadow.camera.near = 20;
+        sunLight.shadow.camera.far = 420;
+        const sd = 170;
+        sunLight.shadow.camera.left = -sd;
+        sunLight.shadow.camera.right = sd;
+        sunLight.shadow.camera.top = sd;
+        sunLight.shadow.camera.bottom = -sd;
+        sunLight.shadow.bias = -0.0008;
+        scene.add(sunLight);
+
+        // Huge Outer Terrain Platform
+        const groundGeo = new THREE.CylinderGeometry(330, 330, 4, 32);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9, metalness: 0.1 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.position.y = -2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const interactables = [];
+        const dynamicVisuals = {
+            waterfallMesh: null,
+            reservoirWater: null,
+            xylemPlants: [],
+            ironBridgeMesh: null,
+            powerCables: [],
+            cityLights: [],
+            cranePulleys: null,
+            blastDoor: null,
+            radBeams: { alpha: null, beta: null, gamma: null },
+            auroralShield: null,
+            satelliteDish: null,
+            flareFlames: null,
+            opticalRay: null
+        };
+
+        // Shared Standard Materials
+        const materials = {
+            stone: new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85 }),
+            sciFi: new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 }),
+            sand: new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.95 }),
+            wood: new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 }),
+            leaf: new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.8 })
+        };
+
+        /* ==========================================================================
+           5. BUILD OPTIMIZED PROCEDURAL BIOMES
+           ========================================================================== */
+
+        // 5.1 NORTH: ANIMUS CITADEL (Ch. 1 & Ch. 9/10)
+        function buildAnimusNorth() {
+            const group = new THREE.Group();
+            group.position.set(0, 0, -150);
+
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(58, 62, 2, 24), materials.sciFi);
+            base.position.y = -1;
+            group.add(base);
+
+            // Batched / Shared Towers
+            const towerGeo = new THREE.CylinderGeometry(4, 4.6, 28, 12);
+            const towerPositions = [[-25, -15], [25, -15], [-25, 20], [25, 20]];
+            towerPositions.forEach((pos, idx) => {
+                const tower = new THREE.Mesh(towerGeo, materials.stone);
+                tower.position.set(pos[0], 14, pos[1]);
+                tower.castShadow = true;
+                group.add(tower);
+                spatialGrid.addCylinder(pos[0], -150 + pos[1], 4.6, 28, 14, 'tower_' + idx);
+            });
+
+            // Ch 1: Sensor Optic Tower
+            const sensorTower = new THREE.Mesh(new THREE.BoxGeometry(10, 18, 10), materials.sciFi);
+            sensorTower.position.set(0, 9, -15);
+            sensorTower.castShadow = true;
+            group.add(sensorTower);
+            spatialGrid.addBox(0, -165, 10, 10, 18, 9, 'sensor_optic_tower');
+
+            // Holographic Optical Ray Line
+            const rayGeo = new THREE.CylinderGeometry(0.15, 0.15, 14, 8);
+            const rayMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.4 });
+            const ray = new THREE.Mesh(rayGeo, rayMat);
+            ray.rotation.x = Math.PI / 2;
+            ray.position.set(0, 9, -5);
+            group.add(ray);
+            dynamicVisuals.opticalRay = ray;
+
+            interactables.push({
+                id: 'station_optics',
+                name: 'Neural Sensor Optic Chamber (Fovea Alignment)',
+                position: new THREE.Vector3(0, 2, -165),
+                radius: 7.5,
+                action: 'open_station',
+                stationId: 'optics'
+            });
+
+            // Ch 9 & 10: Space Weather Station & Keplerian Satellite Dish (Z: -50)
+            const satGroup = new THREE.Group();
+            satGroup.position.set(0, 0, 100);
+
+            const dishStand = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, 8, 8), materials.stone);
+            dishStand.position.y = 4;
+            satGroup.add(dishStand);
+            spatialGrid.addCylinder(0, -50, 2, 8, 4, 'dish_stand');
+
+            const dish = new THREE.Mesh(
+                new THREE.SphereGeometry(4, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+                new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, side: THREE.DoubleSide })
+            );
+            dish.rotation.x = Math.PI * 0.7;
+            dish.position.y = 9;
+            satGroup.add(dish);
+            dynamicVisuals.satelliteDish = dish;
+
+            // Geomagnetic Auroral Dome Mesh
+            const dome = new THREE.Mesh(
+                new THREE.SphereGeometry(18, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+                new THREE.MeshBasicMaterial({ color: 0xa855f7, wireframe: true, transparent: true, opacity: 0.0 })
+            );
+            dome.position.y = 0;
+            satGroup.add(dome);
+            dynamicVisuals.auroralShield = dome;
+
+            group.add(satGroup);
+
+            interactables.push({
+                id: 'station_space',
+                name: 'Space Weather Deflector & Satellite Array',
+                position: new THREE.Vector3(0, 2, -50),
+                radius: 7.5,
+                action: 'open_station',
+                stationId: 'space'
+            });
+
+            scene.add(group);
+        }
+
+        // 5.2 WEST: VOXEL DESERT & BLAST FURNACE (Ch. 2, 3, 4 & 5)
+        function buildVoxelWest() {
+            const group = new THREE.Group();
+            group.position.set(-145, 0, 0);
+
+            const sandBase = new THREE.Mesh(new THREE.CylinderGeometry(60, 64, 2, 24), materials.sand);
+            sandBase.position.y = -1;
+            group.add(sandBase);
+
+            // Ch 2 & 5: Flare Reactor Core (X: -140, Z: -60)
+            const flareCore = new THREE.Mesh(
+                new THREE.CylinderGeometry(4.5, 5.5, 12, 12),
+                new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.3, metalness: 0.8 })
+            );
+            flareCore.position.set(5, 6, -60);
+            flareCore.castShadow = true;
+            group.add(flareCore);
+            spatialGrid.addCylinder(-140, -60, 5.5, 12, 6, 'flare_reactor');
+
+            const flames = new THREE.Mesh(new THREE.ConeGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.85 }));
+            flames.position.set(5, 14, -60);
+            group.add(flames);
+            dynamicVisuals.flareFlames = flames;
+
+            interactables.push({
+                id: 'station_thermal',
+                name: 'Exothermic Flare Reactor (Endothermic Scrubber)',
+                position: new THREE.Vector3(-140, 2, -60),
+                radius: 7.5,
+                action: 'open_station',
+                stationId: 'thermal'
+            });
+
+            // Ch 4: Blast Furnace (X: -150, Z: 0)
+            const furnace = new THREE.Mesh(new THREE.BoxGeometry(10, 16, 10), materials.stone);
+            furnace.position.set(-5, 8, 0);
+            furnace.castShadow = true;
+            group.add(furnace);
+            spatialGrid.addBox(-150, 0, 10, 10, 16, 8, 'blast_furnace');
+
+            const bridge = new THREE.Mesh(
+                new THREE.BoxGeometry(24, 1.2, 7),
+                new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9, roughness: 0.2, transparent: true, opacity: 0.2 })
+            );
+            bridge.position.set(22, 1, 0);
+            group.add(bridge);
+            dynamicVisuals.ironBridgeMesh = bridge;
+
+            interactables.push({
+                id: 'station_smelt',
+                name: 'Voxel Blast Furnace (Reduction by Carbon)',
+                position: new THREE.Vector3(-150, 2, 0),
+                radius: 7.5,
+                action: 'open_station',
+                stationId: 'smelt'
+            });
+
+            // Ch 3: Water Reservoir (X: -140, Z: 60)
+            const hydroChamber = new THREE.Mesh(new THREE.BoxGeometry(9, 8, 7), materials.sciFi);
+            hydroChamber.position.set(5, 4, 60);
+            group.add(hydroChamber);
+            spatialGrid.addBox(-140, 60, 9, 7, 8, 4, 'hydro_chamber');
+
+            const waterMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(14.5, 14.5, 0.8, 24),
+                new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.8, roughness: 0.1, transparent: true, opacity: 0.88 })
+            );
+            waterMesh.position.set(5, 0.9, 80);
+            waterMesh.scale.set(0.01, 0.01, 0.01);
+            group.add(waterMesh);
+            dynamicVisuals.reservoirWater = waterMesh;
+
+            // Xylem plants around oasis
+            for (let p = 0; p < 8; p++) {
+                const ang = (p * Math.PI * 2) / 8;
+                const shrub = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2), materials.leaf);
+                shrub.position.set(5 + Math.cos(ang) * 16, 0.6, 80 + Math.sin(ang) * 16);
+                shrub.scale.set(0.01, 0.01, 0.01);
+                group.add(shrub);
+                dynamicVisuals.xylemPlants.push(shrub);
+            }
+
+            interactables.push({
+                id: 'station_water',
+                name: 'Catalytic Hydro-Synthesizer (2H₂ + O₂ → 2H₂O)',
+                position: new THREE.Vector3(-140, 2, 60),
+                radius: 7.5,
+                action: 'open_station',
+                stationId: 'water'
+            });
+
+            scene.add(group);
+        }
+
+        // 5.3 EAST: CHRONO CYBER-CITADEL (Ch. 6 & Ch. 7)
+        function buildChronoEast() {
+            const group = new THREE.Group();
+            group.position.set(145, 0, 0);
+
+            const techBase = new THREE.Mesh(new THREE.CylinderGeometry(60, 64, 2, 24), materials.sciFi);
+            techBase.position.y = -1;
+            group.add(techBase);
+
+            // Ch 6: Transformers
+            const genBay = new THREE.Mesh(new THREE.BoxGeometry(9, 8, 9), materials.sciFi);
+            genBay.position.set(-15, 4, -50);
+            genBay.castShadow = true;
+            group.add(genBay);
+            spatialGrid.addBox(130, -50, 9, 9, 8, 4, 'step_up_bay');
+
+            const subBay = new THREE.Mesh(new THREE.BoxGeometry(9, 8, 9), materials.sciFi);
+            subBay.position.set(15, 4, -50);
+            subBay.castShadow = true;
+            group.add(subBay);
+            spatialGrid.addBox(160, -50, 9, 9, 8, 4, 'step_down_bay');
+
+            const cableGeo = new THREE.CylinderGeometry(0.2, 0.2, 30, 8);
+            const cableMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+            const cable = new THREE.Mesh(cableGeo, cableMat);
+            cable.rotation.z = Math.PI / 2;
+            cable.position.set(0, 12, -50);
+            group.add(cable);
+            dynamicVisuals.powerCables.push(cable);
+
+            // City Towers with Neon trims
+            for (let b = 0; b < 4; b++) {
+                const bldg = new THREE.Mesh(new THREE.BoxGeometry(10, 24 + b * 6, 10), materials.sciFi);
+                bldg.position.set(-15 + (b % 2) * 30, 12 + b * 3, -15 + Math.floor(b / 2) * 30);
+                group.add(bldg);
+                spatialGrid.addBox(130 + (b % 2) * 30, -15 + Math.floor(b / 2) * 30, 10, 10, 24 + b * 6, 12 + b * 3, 'citadel_bldg_' + b);
+
+                const neon = new THREE.Mesh(new THREE.BoxGeometry(10.4, 1.2, 10.4), new THREE.MeshBasicMaterial({ color: 0x1e293b }));
+                neon.position.set(-15 + (b % 2) * 30, 24 + b * 6, -15 + Math.floor(b / 2) * 30);
+                group.add(neon);
+                dynamicVisuals.cityLights.push(neon);
+            }
+
+            interactables.push({
+                id: 'station_grid',
+                name: 'Step-Up & Step-Down Transformer Station (132 kV / 240 V)',
+                position: new THREE.Vector3(130, 2, -50),
+                radius: 7.5,
+                action: 'open_station',
+                stationId: 'grid'
+            });
+
+            // Ch 7: Work & Power Crane (X: 140, Z: 50)
+            const craneMast = new THREE.Mesh(new THREE.BoxGeometry(2.5, 26, 2.5), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.7 }));
+            craneMast.position.set(-5, 13, 50);
+            group.add(craneMast);
+            spatialGrid.addBox(140, 50, 2.5, 2.5, 26, 13, 'crane_mast');
+
+            const craneJib = new THREE.Mesh(new THREE.BoxGeometry(16, 2, 2), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.7 }));
+            craneJib.position.set(1, 25, 50);
+            group.add(craneJib);
+
+            const pulleyWeight = new THREE.Mesh(new THREE.BoxGeometry(3.5, 3.5, 3.5), materials.stone);
+            pulleyWeight.position.set(6, 4, 50);
+            group.add(pulleyWeight);
+            dynamicVisuals.cranePulleys = pulleyWeight;
+
+            const blastDoor = new THREE.Mesh(new THREE.BoxGeometry(12, 14, 2), materials.sciFi);
+            blastDoor.position.set(16, 7, 50);
+            group.add(blastDoor);
+            dynamicVisuals.blastDoor = blastDoor;
+            spatialGrid.addBox(161, 50, 12, 2, 14, 7, 'crane_blast_door');
+
+            interactables.push({
+                id: 'station_work',
+                name: 'Mechanical Pulley Crane (W = F × s, Ep = mgh)',
+                position: new THREE.Vector3(140, 2, 50),
+                radius: 7.5,
+                action: 'open_station',
+                stationId: 'work'
+            });
+
+            scene.add(group);
+        }
+
+        // 5.4 SOUTH: IONIZING RADIATION CRATER (Ch. 8)
+        function buildRadiationSouth() {
+            const group = new THREE.Group();
+            group.position.set(0, 0, 155);
+
+            const craterBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(58, 62, 2, 24),
+                new THREE.MeshStandardMaterial({ color: 0x064e3b, roughness: 0.8 })
+            );
+            craterBase.position.y = -1;
+            group.add(craterBase);
+
+            const reactor = new THREE.Mesh(new THREE.BoxGeometry(10, 12, 10), materials.sciFi);
+            reactor.position.set(0, 6, 0);
+            group.add(reactor);
+            spatialGrid.addBox(0, 155, 10, 10, 12, 6, 'radiation_reactor');
+
+            const aBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.85 }));
+            aBeam.rotation.z = Math.PI / 2;
+            aBeam.position.set(-8, 6, -3.5);
+            group.add(aBeam);
+            dynamicVisuals.radBeams.alpha = aBeam;
+
+            const bBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 12, 8), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 }));
+            bBeam.rotation.z = Math.PI / 2;
+            bBeam.position.set(-8, 6, 0);
+            group.add(bBeam);
+            dynamicVisuals.radBeams.beta = bBeam;
+
+            const gBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 12, 8), new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.95 }));
+            gBeam.rotation.z = Math.PI / 2;
+            gBeam.position.set(-8, 6, 3.5);
+            group.add(gBeam);
+            dynamicVisuals.radBeams.gamma = gBeam;
+
+            interactables.push({
+                id: 'station_radiation',
+                name: 'Ionizing Shielding Array (α, β, γ Containment)',
+                position: new THREE.Vector3(0, 2, 155),
+                radius: 7.5,
+                action: 'open_station',
+                stationId: 'radiation'
+            });
+
+            scene.add(group);
+        }
+
+        // 5.5 CENTRAL HUB
+        function buildCentralHub() {
+            const group = new THREE.Group();
+            group.position.set(0, 0, 0);
+
+            const hub = new THREE.Mesh(new THREE.CylinderGeometry(22, 24, 1.5, 24), materials.sciFi);
+            hub.position.y = -0.75;
+            group.add(hub);
+
+            const monolith = new THREE.Mesh(
+                new THREE.BoxGeometry(2.8, 16, 2.8),
+                new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.95, roughness: 0.1 })
+            );
+            monolith.position.y = 8;
+            group.add(monolith);
+            spatialGrid.addBox(0, 0, 2.8, 2.8, 16, 8, 'hub_monolith');
+
+            scene.add(group);
+        }
+
+        buildAnimusNorth();
+        buildVoxelWest();
+        buildChronoEast();
+        buildRadiationSouth();
+        buildCentralHub();
+
+        /* ==========================================================================
+           6. HARVESTABLE SCIENCE ITEMS SCATTERED ACROSS BIOMES
+           ========================================================================== */
+        const harvestableItems = [];
+
+        function spawnItemPickup(itemDef, pos, colorHex) {
+            const group = new THREE.Group();
+            group.position.copy(pos);
+
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 1.2, 1.2),
+                new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.7, roughness: 0.3 })
+            );
+            mesh.position.y = 0.9;
+            group.add(mesh);
+
+            const light = new THREE.PointLight(colorHex, 1.0, 7);
+            light.position.y = 1.6;
+            group.add(light);
+
+            scene.add(group);
+
+            const record = { item: itemDef, group, mesh, collected: false };
+            harvestableItems.push(record);
+
+            interactables.push({
+                id: 'harvest_' + Math.random().toString(36).substr(2, 6),
+                name: `Collect ${itemDef.name}`,
+                position: pos,
+                radius: 4.5,
+                action: 'harvest_item',
+                refData: record
+            });
+        }
+
+        // Ch 1
+        spawnItemPickup(INVENTORY_ITEMS.BICONVEX_LENS, new THREE.Vector3(-18, 0, -145), 0x38bdf8);
+        // Ch 2 & 5
+        spawnItemPickup(INVENTORY_ITEMS.AMMONIUM_NITRATE, new THREE.Vector3(-125, 0, -75), 0xa5f3fc);
+        spawnItemPickup(INVENTORY_ITEMS.AMMONIUM_NITRATE, new THREE.Vector3(-155, 0, -50), 0xa5f3fc);
+        // Ch 3
+        spawnItemPickup(INVENTORY_ITEMS.HYDROGEN_CAN, new THREE.Vector3(-125, 0, 50), 0xf97316);
+        spawnItemPickup(INVENTORY_ITEMS.HYDROGEN_CAN, new THREE.Vector3(-155, 0, 70), 0xf97316);
+        spawnItemPickup(INVENTORY_ITEMS.OXYGEN_TANK, new THREE.Vector3(-135, 0, 85), 0x38bdf8);
+        // Ch 4
+        spawnItemPickup(INVENTORY_ITEMS.HEMATITE_ORE, new THREE.Vector3(-165, 0, -15), 0x9a3412);
+        spawnItemPickup(INVENTORY_ITEMS.COKE_CARBON, new THREE.Vector3(-165, 0, 15), 0x334155);
+        // Ch 6
+        spawnItemPickup(INVENTORY_ITEMS.STEP_UP_COIL, new THREE.Vector3(120, 0, -40), 0xeab308);
+        spawnItemPickup(INVENTORY_ITEMS.STEP_DOWN_COIL, new THREE.Vector3(170, 0, -60), 0xeab308);
+        // Ch 7
+        spawnItemPickup(INVENTORY_ITEMS.CRANE_COUNTERWEIGHT, new THREE.Vector3(125, 0, 45), 0x64748b);
+        // Ch 8
+        spawnItemPickup(INVENTORY_ITEMS.PAPER_SHEET, new THREE.Vector3(-15, 0, 145), 0xf8fafc);
+        spawnItemPickup(INVENTORY_ITEMS.ALU_PLATE, new THREE.Vector3(15, 0, 145), 0xcbd5e1);
+        spawnItemPickup(INVENTORY_ITEMS.LEAD_BLOCK, new THREE.Vector3(0, 0, 170), 0x475569);
+        // Ch 9 & 10
+        spawnItemPickup(INVENTORY_ITEMS.GEOMAGNETIC_COIL, new THREE.Vector3(15, 0, -40), 0xc084fc);
+
+        /* ==========================================================================
+           7. THIRD-PERSON CHARACTER & PROP HANDLING
+           ========================================================================== */
+        const playerGroup = new THREE.Group();
+        playerGroup.position.set(0, 0, 8);
+
+        const suitMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35, metalness: 0.65 });
+        const limbMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5 });
+
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 1.7, 12), suitMat);
+        torso.position.y = 1.35;
+        torso.castShadow = true;
+        playerGroup.add(torso);
+
+        const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.52, 12, 12), limbMat);
+        helmet.position.y = 2.5;
+        helmet.castShadow = true;
+        playerGroup.add(helmet);
+
+        const visor = new THREE.Mesh(
+            new THREE.BoxGeometry(0.62, 0.28, 0.4),
+            new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.7 })
+        );
+        visor.position.set(0, 2.5, 0.38);
+        playerGroup.add(visor);
+
+        const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.1, 8), limbMat);
+        leftArm.position.set(-0.75, 1.4, 0);
+        playerGroup.add(leftArm);
+
+        const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.1, 8), limbMat);
+        rightArm.position.set(0.75, 1.4, 0);
+        playerGroup.add(rightArm);
+
+        const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8), limbMat);
+        leftLeg.position.set(-0.35, 0.6, 0);
+        playerGroup.add(leftLeg);
+
+        const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8), limbMat);
+        rightLeg.position.set(0.35, 0.6, 0);
+        playerGroup.add(rightLeg);
+
+        const jetpack = new THREE.Mesh(
+            new THREE.BoxGeometry(0.8, 0.9, 0.4),
+            new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9 })
+        );
+        jetpack.position.set(0, 1.5, -0.45);
+        playerGroup.add(jetpack);
+
+        const carriedProp = new THREE.Group();
+        carriedProp.position.set(0.6, 1.4, 0.8);
+        playerGroup.add(carriedProp);
+
+        scene.add(playerGroup);
+
+        /* ==========================================================================
+           8. INPUT HANDLING & ORBIT CAMERA
+           ========================================================================== */
+        const inputState = { forward: 0, backward: 0, left: 0, right: 0, sprint: false };
+        const cameraState = { radius: 12, theta: Math.PI / 2, phi: Math.PI / 3.4, isDragging: false, prevX: 0, prevY: 0 };
+
+        window.addEventListener('keydown', (e) => {
+            if (gameState.modalOpen) return;
+            switch(e.code) {
+                case 'KeyW': case 'ArrowUp': inputState.forward = 1; break;
+                case 'KeyS': case 'ArrowDown': inputState.backward = 1; break;
+                case 'KeyA': case 'ArrowLeft': inputState.left = 1; break;
+                case 'KeyD': case 'ArrowRight': inputState.right = 1; break;
+                case 'ShiftLeft': case 'ShiftRight': inputState.sprint = true; break;
+                case 'Space': triggerJump(); break;
+                case 'KeyE': triggerInteract(); break;
+                case 'KeyF': triggerUseCarried(); break;
+                case 'Digit1': selectSlot(0); break;
+                case 'Digit2': selectSlot(1); break;
+                case 'Digit3': selectSlot(2); break;
+                case 'Digit4': selectSlot(3); break;
+                case 'Digit5': selectSlot(4); break;
+                case 'Digit6': selectSlot(5); break;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            switch(e.code) {
+                case 'KeyW': case 'ArrowUp': inputState.forward = 0; break;
+                case 'KeyS': case 'ArrowDown': inputState.backward = 0; break;
+                case 'KeyA': case 'ArrowLeft': inputState.left = 0; break;
+                case 'KeyD': case 'ArrowRight': inputState.right = 0; break;
+                case 'ShiftLeft': case 'ShiftRight': inputState.sprint = false; break;
+            }
+        });
+
+        function triggerJump() {
+            if (gameState.player.isGrounded) {
+                gameState.player.jumpVel = 0.32;
+                gameState.player.isGrounded = false;
+                SoundFX.playTone(320, 'sine', 0.08, 0.1);
+            }
+        }
+
+        // Camera Orbit
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.tagName !== 'BUTTON' && !gameState.modalOpen) {
+                cameraState.isDragging = true;
+                cameraState.prevX = e.clientX;
+                cameraState.prevY = e.clientY;
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!cameraState.isDragging) return;
+            const dx = e.clientX - cameraState.prevX;
+            const dy = e.clientY - cameraState.prevY;
+            cameraState.theta -= dx * 0.006;
+            cameraState.phi = Math.max(0.18, Math.min(Math.PI / 2.1, cameraState.phi - dy * 0.006));
+            cameraState.prevX = e.clientX;
+            cameraState.prevY = e.clientY;
+        });
+
+        window.addEventListener('mouseup', () => cameraState.isDragging = false);
+
+        // Mobile Controls
+        const joystickBase = document.getElementById('joystick-base');
+        const joystickHandle = document.getElementById('joystick-handle');
+        let joyId = null;
+        let joyOrigin = { x: 0, y: 0 };
+
+        if (joystickBase) {
+            joystickBase.addEventListener('touchstart', (e) => {
+                const touch = e.changedTouches[0];
+                joyId = touch.identifier;
+                const rect = joystickBase.getBoundingClientRect();
+                joyOrigin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                updateJoy(touch.clientX, touch.clientY);
+            }, { passive: false });
+
+            window.addEventListener('touchmove', (e) => {
+                if (joyId === null) return;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === joyId) {
+                        updateJoy(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            const endJoy = (e) => {
+                if (joyId === null) return;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === joyId) {
+                        joyId = null;
+                        joystickHandle.style.transform = 'translate(0, 0)';
+                        inputState.forward = 0; inputState.backward = 0;
+                        inputState.left = 0; inputState.right = 0;
+                        break;
+                    }
+                }
+            };
+            window.addEventListener('touchend', endJoy);
+            window.addEventListener('touchcancel', endJoy);
+        }
+
+        function updateJoy(cx, cy) {
+            const dx = cx - joyOrigin.x;
+            const dy = cy - joyOrigin.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxR = 36;
+            const clamped = Math.min(dist, maxR);
+            const angle = Math.atan2(dy, dx);
+            const kx = Math.cos(angle) * clamped;
+            const ky = Math.sin(angle) * clamped;
+
+            joystickHandle.style.transform = `translate(${kx}px, ${ky}px)`;
+            inputState.forward = ky < -8 ? -ky / maxR : 0;
+            inputState.backward = ky > 8 ? ky / maxR : 0;
+            inputState.left = kx < -8 ? -kx / maxR : 0;
+            inputState.right = kx > 8 ? kx / maxR : 0;
+        }
+
+        document.getElementById('btn-mobile-jump').addEventListener('click', triggerJump);
+        document.getElementById('btn-mobile-sprint').addEventListener('click', () => {
+            inputState.sprint = !inputState.sprint;
+        });
+        document.getElementById('btn-mobile-use').addEventListener('click', () => {
+            if (gameState.activeInteractable) triggerInteract();
+            else triggerUseCarried();
+        });
+
+        /* ==========================================================================
+           9. INVENTORY MANAGEMENT
+           ========================================================================== */
+        function selectSlot(idx) {
+            gameState.player.selectedSlot = idx;
+            document.querySelectorAll('.item-slot').forEach((slot, i) => {
+                if (i === idx) slot.classList.add('selected');
+                else slot.classList.remove('selected');
+            });
+            updateCarriedProp();
+            updateHeldBanner();
+            SoundFX.playTone(520, 'sine', 0.05, 0.06);
+        }
+
+        function addToInventory(item) {
+            for (let i = 0; i < gameState.player.inventory.length; i++) {
+                if (gameState.player.inventory[i] === null) {
+                    gameState.player.inventory[i] = item;
+                    refreshInventoryUI();
+                    selectSlot(i);
+                    return true;
+                }
+            }
+            showToast("Inventory full! Free a slot.", "⚠️");
+            return false;
+        }
+
+        function removeFromInventory(slotIdx) {
+            gameState.player.inventory[slotIdx] = null;
+            refreshInventoryUI();
+            updateCarriedProp();
+            updateHeldBanner();
+        }
+
+        function refreshInventoryUI() {
+            const slots = document.querySelectorAll('.item-slot');
+            slots.forEach((el, idx) => {
+                const item = gameState.player.inventory[idx];
+                const icon = el.querySelector('.slot-icon');
+                const qty = el.querySelector('.slot-qty');
+                if (item) {
+                    icon.innerHTML = `<i data-lucide="${item.icon}" class="w-5 h-5 md:w-6 md:h-6" style="color:${item.color}"></i>`;
+                    qty.innerText = "1";
+                } else {
+                    icon.innerHTML = `<i data-lucide="circle-dashed" class="w-4 h-4 md:w-5 md:h-5 text-slate-700"></i>`;
+                    qty.innerText = "0";
+                }
+            });
+            lucide.createIcons();
+        }
+
+        function updateCarriedProp() {
+            while (carriedProp.children.length > 0) carriedProp.remove(carriedProp.children[0]);
+            const cur = gameState.player.inventory[gameState.player.selectedSlot];
+            if (!cur) return;
+            const propMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                new THREE.MeshStandardMaterial({ color: cur.color, roughness: 0.4 })
+            );
+            carriedProp.add(propMesh);
+        }
+
+        function updateHeldBanner() {
+            const held = gameState.player.inventory[gameState.player.selectedSlot];
+            const banner = document.getElementById('held-item-indicator');
+            if (held) {
+                banner.innerHTML = `<span class="w-2.5 h-2.5 rounded-full" style="background:${held.color}"></span> Equipped: <b class="text-white">${held.name}</b> <span class="text-[10px] text-cyan-400">(${held.chapter})</span>`;
+            } else {
+                banner.innerHTML = `<span>Hands: Empty (Select 1-6)</span>`;
+            }
+        }
+
+        document.querySelectorAll('.item-slot').forEach((s, idx) => {
+            s.addEventListener('click', () => selectSlot(idx));
+        });
+
+        /* ==========================================================================
+           10. RADAR MINIMAP & NAVIGATION
+           ========================================================================== */
+        const radarCanvas = document.getElementById('radar-canvas');
+        const radarCtx = radarCanvas.getContext('2d');
+
+        function renderRadarMinimap() {
+            const w = radarCanvas.width;
+            const h = radarCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+
+            radarCtx.clearRect(0, 0, w, h);
+
+            radarCtx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+            radarCtx.lineWidth = 1;
+            radarCtx.beginPath();
+            radarCtx.arc(cx, cy, 18, 0, Math.PI * 2);
+            radarCtx.arc(cx, cy, 38, 0, Math.PI * 2);
+            radarCtx.stroke();
+
+            const scale = 0.24;
+
+            gameState.quests.forEach(q => {
+                const rx = cx + (q.pos.x - playerGroup.position.x) * scale;
+                const rz = cy + (q.pos.z - playerGroup.position.z) * scale;
+
+                const dist = Math.hypot(rx - cx, rz - cy);
+                const maxR = cx - 5;
+                let drawX = rx;
+                let drawY = rz;
+
+                if (dist > maxR) {
+                    const ang = Math.atan2(rz - cy, rx - cx);
+                    drawX = cx + Math.cos(ang) * maxR;
+                    drawY = cy + Math.sin(ang) * maxR;
+                }
+
+                radarCtx.fillStyle = q.solved ? '#22c55e' : q.color;
+                radarCtx.beginPath();
+                radarCtx.arc(drawX, drawY, q.solved ? 2.5 : 3.5, 0, Math.PI * 2);
+                radarCtx.fill();
+            });
+
+            // Player Icon
+            radarCtx.fillStyle = '#ffffff';
+            radarCtx.beginPath();
+            radarCtx.arc(cx, cy, 3, 0, Math.PI * 2);
+            radarCtx.fill();
+
+            radarCtx.strokeStyle = '#38bdf8';
+            radarCtx.lineWidth = 2;
+            radarCtx.beginPath();
+            radarCtx.moveTo(cx, cy);
+            radarCtx.lineTo(
+                cx + Math.sin(playerGroup.rotation.y) * 8,
+                cy + Math.cos(playerGroup.rotation.y) * 8
+            );
+            radarCtx.stroke();
+
+            document.getElementById('player-coords-hud').innerText =
+                `X: ${Math.round(playerGroup.position.x)} | Z: ${Math.round(playerGroup.position.z)}`;
+        }
+
+        /* ==========================================================================
+           11. INTERACTIVE APPARATUS CALIBRATIONS (ALL 8 CHAPTERS)
+           ========================================================================== */
+        const apparatusModal = document.getElementById('apparatus-modal');
+        const apparatusTitle = document.getElementById('apparatus-title');
+        const apparatusSubtitle = document.getElementById('apparatus-subtitle');
+        const apparatusBody = document.getElementById('apparatus-body');
+        const apparatusFeedback = document.getElementById('apparatus-feedback');
+        const apparatusActionBtn = document.getElementById('apparatus-action-btn');
+
+        function triggerInteract() {
+            const it = gameState.activeInteractable;
+            if (!it) return;
+
+            if (it.action === 'harvest_item') {
+                const added = addToInventory(it.refData.item);
+                if (added) {
+                    it.refData.collected = true;
+                    scene.remove(it.refData.group);
+                    SoundFX.playHarvest();
+                    showToast(`Acquired: ${it.refData.item.name}`, "📦");
+                }
+            } else if (it.action === 'open_station') {
+                openStationInterface(it.stationId);
+            }
+        }
+
+        function triggerUseCarried() {
+            const held = gameState.player.inventory[gameState.player.selectedSlot];
+            if (!held) {
+                showToast("No item equipped in hands!", "✋");
+                return;
+            }
+            if (gameState.activeInteractable) triggerInteract();
+            else showToast(`Holding ${held.name}. Navigate to its assigned crisis station!`, "ℹ️");
+        }
+
+        function openStationInterface(id) {
+            gameState.modalOpen = true;
+            apparatusFeedback.classList.add('hidden');
+            apparatusModal.classList.remove('hidden');
+            SoundFX.playInstall();
+
+            switch(id) {
+                case 'optics': renderOpticsUI(); break;
+                case 'thermal': renderThermalUI(); break;
+                case 'water': renderWaterUI(); break;
+                case 'smelt': renderSmeltUI(); break;
+                case 'grid': renderGridUI(); break;
+                case 'work': renderWorkUI(); break;
+                case 'radiation': renderRadiationUI(); break;
+                case 'space': renderSpaceUI(); break;
+            }
+            lucide.createIcons();
+        }
+
+        function closeStationInterface() {
+            apparatusModal.classList.add('hidden');
+            gameState.modalOpen = false;
+        }
+
+        document.getElementById('btn-close-apparatus').addEventListener('click', closeStationInterface);
+
+        // --- CH 1: OPTICAL ALIGNMENT ---
+        function renderOpticsUI() {
+            apparatusTitle.innerText = "Chapter 1: Neural Sensor Optic Chamber";
+            apparatusSubtitle.innerText = "Focusing light rays onto the Yellow Spot (Fovea centralis)";
+
+            const st = gameState.puzzleStates.optics;
+            apparatusBody.innerHTML = `
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-cyan-500/30 space-y-4">
+                    <p class="text-xs text-slate-300">
+                        The eye's biconvex lens refracts incoming light to converge on the <b>Yellow Spot (Fovea)</b>. Slot the biconvex lens and adjust the ciliary focal slider and pupil aperture to achieve 100% sharpness.
+                    </p>
+                    <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                        <span class="text-xs font-bold text-cyan-300">Biconvex Lens Socket:</span>
+                        <button id="btn-lens-slot" class="px-3 py-1 rounded text-xs font-bold ${st.lensInstalled ? 'bg-emerald-600' : 'bg-cyan-700'}">
+                            ${st.lensInstalled ? 'Installed ✓' : 'Insert Lens from Hands'}
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-xs font-bold mb-1">
+                                <span>Ciliary Curvature Focus (Target: 75)</span>
+                                <span id="val-focus">${st.focusSlider}</span>
+                            </div>
+                            <input type="range" id="slider-focus" min="0" max="100" value="${st.focusSlider}" class="w-full accent-cyan-400">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs font-bold mb-1">
+                                <span>Iris Pupil Aperture (Target: 40)</span>
+                                <span id="val-aperture">${st.apertureSlider}</span>
+                            </div>
+                            <input type="range" id="slider-aperture" min="0" max="100" value="${st.apertureSlider}" class="w-full accent-cyan-400">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-lens-slot').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'BICONVEX_LENS') {
+                    st.lensInstalled = true;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    renderOpticsUI();
+                } else showFeedback("Equip the Biconvex Eye Lens in hand!", false);
+            };
+
+            const sF = document.getElementById('slider-focus');
+            const sA = document.getElementById('slider-aperture');
+            sF.oninput = (e) => { st.focusSlider = parseInt(e.target.value); document.getElementById('val-focus').innerText = st.focusSlider; };
+            sA.oninput = (e) => { st.apertureSlider = parseInt(e.target.value); document.getElementById('val-aperture').innerText = st.apertureSlider; };
+
+            apparatusActionBtn.innerText = "Lock Optical Convergence";
+            apparatusActionBtn.onclick = () => {
+                if (!st.lensInstalled) { showFeedback("Cannot focus without biconvex lens!", false); return; }
+                if (Math.abs(st.focusSlider - 75) <= 5 && Math.abs(st.apertureSlider - 40) <= 5) {
+                    completeQuest(0);
+                    dynamicVisuals.opticalRay.material.color.setHex(0x22c55e);
+                    dynamicVisuals.opticalRay.material.opacity = 1.0;
+                    showFeedback("Focal rays aligned with Yellow Spot! Photoreceptors stimulated.", true);
+                    setTimeout(closeStationInterface, 1400);
+                } else showFeedback("Image is blurry! Focal length must reach exactly 75, aperture 40.", false);
+            };
+        }
+
+        // --- CH 2 & 5: THERMAL EXOTHERMIC FLARE ---
+        function renderThermalUI() {
+            apparatusTitle.innerText = "Chapters 2 & 5: Thermal Core & Scrubbers";
+            apparatusSubtitle.innerText = "Endothermic Heat Absorption (ΔH > 0) to quench runaway core";
+
+            const st = gameState.puzzleStates.thermal;
+            apparatusBody.innerHTML = `
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-rose-500/30 space-y-4">
+                    <p class="text-xs text-slate-300">
+                        The exothermic flare core (&Delta;H &lt; 0) is overheating at <b>${st.temp}°C</b>. Add 2 pouches of <b>Ammonium Nitrate (NH₄NO₃)</b>: as it dissolves endothermically (&Delta;H &gt; 0), it absorbs thermal energy from the habitat.
+                    </p>
+                    <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                        <span class="text-xs font-bold text-rose-300">Endothermic Pouches Added:</span>
+                        <span class="text-xl font-hud font-black text-cyan-300">${st.pouchesAdded} / 2</span>
+                    </div>
+                </div>
+            `;
+
+            apparatusActionBtn.innerText = "Deposit Ammonium Nitrate (NH₄NO₃)";
+            apparatusActionBtn.onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'AMMONIUM_NITRATE') {
+                    st.pouchesAdded++;
+                    st.temp -= 185;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    renderThermalUI();
+                    if (st.pouchesAdded >= 2) {
+                        completeQuest(1);
+                        dynamicVisuals.flareFlames.visible = false;
+                        showFeedback("Core quenched! Endothermic cooling restored life-support scrubbers.", true);
+                        setTimeout(closeStationInterface, 1400);
+                    }
+                } else showFeedback("Equip an Ammonium Nitrate (NH₄NO₃) pouch in hand!", false);
+            };
+        }
+
+        // --- CH 3: WATER SYNTHESIS & TRANSPIRATION ---
+        function renderWaterUI() {
+            apparatusTitle.innerText = "Chapter 3: Water Synthesis & Plant Transpiration";
+            apparatusSubtitle.innerText = "Catalytic Chamber: 2H₂ + O₂ → 2H₂O + Energy";
+
+            const st = gameState.puzzleStates.water;
+            apparatusBody.innerHTML = `
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-blue-500/30 space-y-4">
+                    <p class="text-xs text-slate-300">
+                        Synthesize liquid water to trigger root absorption and transpiration pull through xylem to leaf stomata. Requires stoichiometric ratio: <b>2H₂ + 1O₂</b>.
+                    </p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex flex-col items-center">
+                            <span class="text-xs font-bold text-orange-400">Hydrogen Gas (H₂)</span>
+                            <span class="text-xl font-hud font-black text-white mt-1">${st.h2} / 2</span>
+                            <button id="btn-dep-h2" class="mt-2 px-3 py-1 bg-orange-600 rounded text-xs font-bold">Add H₂</button>
+                        </div>
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex flex-col items-center">
+                            <span class="text-xs font-bold text-cyan-400">Oxygen Gas (O₂)</span>
+                            <span class="text-xl font-hud font-black text-white mt-1">${st.o2} / 1</span>
+                            <button id="btn-dep-o2" class="mt-2 px-3 py-1 bg-cyan-600 rounded text-xs font-bold">Add O₂</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-dep-h2').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'HYDROGEN_CAN' && st.h2 < 2) {
+                    st.h2++;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    renderWaterUI();
+                } else showFeedback("Equip a Hydrogen (H₂) canister!", false);
+            };
+
+            document.getElementById('btn-dep-o2').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'OXYGEN_TANK' && st.o2 < 1) {
+                    st.o2++;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    renderWaterUI();
+                } else showFeedback("Equip an Oxygen (O₂) canister!", false);
+            };
+
+            apparatusActionBtn.innerText = "Trigger Catalytic Spark";
+            apparatusActionBtn.onclick = () => {
+                if (st.h2 >= 2 && st.o2 >= 1) {
+                    completeQuest(2);
+                    SoundFX.playWaterRush();
+                    let sc = 0.05;
+                    const itv = setInterval(() => {
+                        sc += 0.05;
+                        dynamicVisuals.reservoirWater.scale.set(sc, 1, sc);
+                        dynamicVisuals.xylemPlants.forEach(p => p.scale.set(sc, sc, sc));
+                        if (sc >= 1) clearInterval(itv);
+                    }, 35);
+                    showFeedback("2H₂ + O₂ → 2H₂O complete! Reservoir filled, transpiration pull initiated.", true);
+                    setTimeout(closeStationInterface, 1400);
+                } else showFeedback("Stoichiometric error: Exact 2 H₂ and 1 O₂ required!", false);
+            };
+        }
+
+        // --- CH 4: BLAST FURNACE REDUCTION ---
+        function renderSmeltUI() {
+            apparatusTitle.innerText = "Chapter 4: Blast Furnace Iron Extraction";
+            apparatusSubtitle.innerText = "Reduction of Iron Oxide by Carbon: 2Fe₂O₃ + 3C → 4Fe + 3CO₂↑";
+
+            const st = gameState.puzzleStates.smelt;
+            apparatusBody.innerHTML = `
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-orange-500/30 space-y-4">
+                    <p class="text-xs text-slate-300">
+                        Because Iron is less reactive than Carbon in the Reactivity Series, Hematite (Fe₂O₃) is reduced by Carbon (Coke). Load both materials into the blast furnace to cast structural iron beams.
+                    </p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex flex-col items-center">
+                            <span class="text-xs font-bold text-orange-400">Hematite (Fe₂O₃)</span>
+                            <span class="text-xl font-hud font-black text-white mt-1">${st.hematite} / 1</span>
+                            <button id="btn-add-hem" class="mt-2 px-3 py-1 bg-orange-700 rounded text-xs font-bold">Add Ore</button>
+                        </div>
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex flex-col items-center">
+                            <span class="text-xs font-bold text-slate-400">Coke / Carbon (C)</span>
+                            <span class="text-xl font-hud font-black text-white mt-1">${st.coke} / 1</span>
+                            <button id="btn-add-coke" class="mt-2 px-3 py-1 bg-slate-700 rounded text-xs font-bold">Add Carbon</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-add-hem').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'HEMATITE_ORE') {
+                    st.hematite++;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    renderSmeltUI();
+                } else showFeedback("Equip Hematite Ore (Fe₂O₃) in hand!", false);
+            };
+
+            document.getElementById('btn-add-coke').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'COKE_CARBON') {
+                    st.coke++;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    renderSmeltUI();
+                } else showFeedback("Equip Coke / Carbon (C) block in hand!", false);
+            };
+
+            apparatusActionBtn.innerText = "Ignite Blast Furnace Reduction";
+            apparatusActionBtn.onclick = () => {
+                if (st.hematite >= 1 && st.coke >= 1) {
+                    completeQuest(3);
+                    SoundFX.playFurnaceSmelt();
+                    dynamicVisuals.ironBridgeMesh.material.opacity = 1.0;
+                    spatialGrid.addBox(-123, 0, 24, 7, 1.2, 1, 'cast_iron_bridge');
+                    showFeedback("Reduction complete! Pure cast iron beam materialized and bridged the chasm.", true);
+                    setTimeout(closeStationInterface, 1400);
+                } else showFeedback("Both Hematite and Carbon must be loaded into the furnace!", false);
+            };
+        }
+
+        // --- CH 6: ELECTRICITY TRANSMISSION ---
+        function renderGridUI() {
+            apparatusTitle.innerText = "Chapter 6: Electricity & Transformers";
+            apparatusSubtitle.innerText = "Minimizing P_loss = I²R via Step-Up and Step-Down Transformers";
+
+            const st = gameState.puzzleStates.grid;
+            apparatusBody.innerHTML = `
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-amber-500/30 space-y-4">
+                    <p class="text-xs text-slate-300">
+                        High current causes enormous heat dissipation (P = I²R). Mount the <b>Step-Up Coil</b> (N<sub>s</sub> &gt; N<sub>p</sub>) at the power station to raise voltage to 132 kV (lowering I), and the <b>Step-Down Coil</b> (N<sub>s</sub> &lt; N<sub>p</sub>) at the city substation to supply safe 240 V.
+                    </p>
+                    <div class="space-y-2.5">
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                            <span class="text-xs font-bold text-amber-300">Step-Up Transformer (132 kV):</span>
+                            <button id="btn-coil-up" class="px-3 py-1 rounded text-xs font-bold ${st.stepUp ? 'bg-emerald-600' : 'bg-amber-600'}">
+                                ${st.stepUp ? 'Installed ✓' : 'Install Step-Up Coil'}
+                            </button>
+                        </div>
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                            <span class="text-xs font-bold text-amber-300">Step-Down Substation (240 V):</span>
+                            <button id="btn-coil-down" class="px-3 py-1 rounded text-xs font-bold ${st.stepDown ? 'bg-emerald-600' : 'bg-amber-600'}">
+                                ${st.stepDown ? 'Installed ✓' : 'Install Step-Down Coil'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-coil-up').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'STEP_UP_COIL') {
+                    st.stepUp = true;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playElectricArc();
+                    renderGridUI();
+                } else showFeedback("Equip the Step-Up Coils (132 kV) in hand!", false);
+            };
+
+            document.getElementById('btn-coil-down').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'STEP_DOWN_COIL') {
+                    st.stepDown = true;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playElectricArc();
+                    renderGridUI();
+                } else showFeedback("Equip the Step-Down Coils (240 V) in hand!", false);
+            };
+
+            apparatusActionBtn.innerText = "Energize Grid System";
+            apparatusActionBtn.onclick = () => {
+                if (st.stepUp && st.stepDown) {
+                    completeQuest(4);
+                    SoundFX.playElectricArc();
+                    dynamicVisuals.powerCables.forEach(c => c.material.color.setHex(0x38bdf8));
+                    dynamicVisuals.cityLights.forEach(l => l.material.color.setHex(0x06b6d4));
+                    showFeedback("Grid calibrated! Voltage boosted to 132kV (zero thermal loss) and stepped to 240V.", true);
+                    setTimeout(closeStationInterface, 1400);
+                } else showFeedback("Both Step-Up and Step-Down transformer coils must be installed!", false);
+            };
+        }
+
+        // --- CH 7: WORK & POTENTIAL ENERGY CRANE ---
+        function renderWorkUI() {
+            apparatusTitle.innerText = "Chapter 7: Work, Energy & Power";
+            apparatusSubtitle.innerText = "Gravitational Potential Energy (Ep = mgh) and Work Done (W = F × s)";
+
+            const st = gameState.puzzleStates.work;
+            apparatusBody.innerHTML = `
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-yellow-500/30 space-y-4">
+                    <p class="text-xs text-slate-300">
+                        To hoist the heavy blast door, attach the counterweight (m = 500 kg) to the pulley and calculate the Work Done (W = F &times; s) and Potential Energy (E<sub>p</sub> = mgh) over h = 20 meters.
+                        <br><code>F = mg = 500 &times; 9.8 = 4900 N</code> &rarr; <code>W = 4900 &times; 20 = 98,000 J (98 kJ)</code>.
+                    </p>
+                    <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                        <span class="text-xs font-bold text-yellow-300">Counterweight Block:</span>
+                        <span class="text-sm font-hud font-bold text-white">${st.counterweights > 0 ? 'Loaded (500 kg)' : 'None'}</span>
+                    </div>
+                </div>
+            `;
+
+            apparatusActionBtn.innerText = st.counterweights > 0 ? "Hoist Pulley (Generate 98 kJ Work)" : "Load Counterweight from Hands";
+            apparatusActionBtn.onclick = () => {
+                if (st.counterweights === 0) {
+                    const heldIdx = gameState.player.selectedSlot;
+                    const held = gameState.player.inventory[heldIdx];
+                    if (held && held.id === 'CRANE_COUNTERWEIGHT') {
+                        st.counterweights = 1;
+                        removeFromInventory(heldIdx);
+                        SoundFX.playInstall();
+                        renderWorkUI();
+                    } else showFeedback("Equip the Crane Counterweight (m=500kg) in hand!", false);
+                } else {
+                    completeQuest(5);
+                    SoundFX.playInstall();
+                    dynamicVisuals.cranePulleys.position.y = 22;
+                    dynamicVisuals.blastDoor.position.y = 20;
+                    showFeedback("Work done = 98 kJ! Potential energy Ep transferred, blast doors unsealed.", true);
+                    setTimeout(closeStationInterface, 1400);
+                }
+            };
+        }
+
+        // --- CH 8: RADIOACTIVITY CONTAINMENT ---
+        function renderRadiationUI() {
+            apparatusTitle.innerText = "Chapter 8: Radioactivity Containment";
+            apparatusSubtitle.innerText = "Shielding Alpha (Paper), Beta (Aluminium), and Gamma (Lead)";
+
+            const st = gameState.puzzleStates.radiation;
+            apparatusBody.innerHTML = `
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-emerald-500/30 space-y-4">
+                    <p class="text-xs text-slate-300">
+                        Three radioactive fissures are leaking ionizing radiation! Install the specific shielding material for each ray type based on its penetrating power.
+                    </p>
+                    <div class="space-y-2.5">
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                            <div><span class="text-xs font-bold text-yellow-400">Alpha (α) Ray Leak</span><p class="text-[10px] text-slate-400">Stopped by Paper sheet</p></div>
+                            <button id="btn-rad-a" class="px-3 py-1 rounded text-xs font-bold ${st.alpha ? 'bg-emerald-600' : 'bg-slate-700'}">${st.alpha ? 'Shielded ✓' : 'Insert Paper'}</button>
+                        </div>
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                            <div><span class="text-xs font-bold text-cyan-400">Beta (β) Ray Leak</span><p class="text-[10px] text-slate-400">Stopped by 5mm Aluminium</p></div>
+                            <button id="btn-rad-b" class="px-3 py-1 rounded text-xs font-bold ${st.beta ? 'bg-emerald-600' : 'bg-slate-700'}">${st.beta ? 'Shielded ✓' : 'Insert Aluminium'}</button>
+                        </div>
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                            <div><span class="text-xs font-bold text-purple-400">Gamma (γ) Ray Leak</span><p class="text-[10px] text-slate-400">Stopped by dense Lead (Pb)</p></div>
+                            <button id="btn-rad-g" class="px-3 py-1 rounded text-xs font-bold ${st.gamma ? 'bg-emerald-600' : 'bg-slate-700'}">${st.gamma ? 'Shielded ✓' : 'Insert Lead'}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-rad-a').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'PAPER_SHEET') {
+                    st.alpha = true;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    dynamicVisuals.radBeams.alpha.visible = false;
+                    renderRadiationUI();
+                    checkRad();
+                } else showFeedback("Alpha particles are blocked by thin Paper!", false);
+            };
+
+            document.getElementById('btn-rad-b').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'ALU_PLATE') {
+                    st.beta = true;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    dynamicVisuals.radBeams.beta.visible = false;
+                    renderRadiationUI();
+                    checkRad();
+                } else showFeedback("Beta particles require a 5mm Aluminium plate!", false);
+            };
+
+            document.getElementById('btn-rad-g').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'LEAD_BLOCK') {
+                    st.gamma = true;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playInstall();
+                    dynamicVisuals.radBeams.gamma.visible = false;
+                    renderRadiationUI();
+                    checkRad();
+                } else showFeedback("Gamma electromagnetic rays require dense Lead (Pb)!", false);
+            };
+
+            function checkRad() {
+                if (st.alpha && st.beta && st.gamma) {
+                    completeQuest(6);
+                    showFeedback("All ionizing radiation contained! Core sealed.", true);
+                    setTimeout(closeStationInterface, 1400);
+                }
+            }
+
+            apparatusActionBtn.innerText = "Close Terminal";
+            apparatusActionBtn.onclick = closeStationInterface;
+        }
+
+        // --- CH 9 & 10: SPACE WEATHER & ASTRONOMY ---
+        function renderSpaceUI() {
+            apparatusTitle.innerText = "Chapters 9 & 10: Space Weather & Satellite Orbit";
+            apparatusSubtitle.innerText = "Coronal Mass Ejection (CME) Mitigation & Keplerian Tracking";
+
+            const st = gameState.puzzleStates.space;
+            apparatusBody.innerHTML = `
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-purple-500/30 space-y-4">
+                    <p class="text-xs text-slate-300">
+                        An incoming solar storm (Coronal Mass Ejection) threatens orbital telemetry. Deploy the <b>Geomagnetic Deflector</b> to repel charged solar wind particles and calibrate the satellite dish to orbital telemetry.
+                    </p>
+                    <div class="space-y-2.5">
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                            <span class="text-xs font-bold text-purple-300">Geomagnetic Deflector Unit:</span>
+                            <button id="btn-dep-mag" class="px-3 py-1 rounded text-xs font-bold ${st.geomagneticOnline ? 'bg-emerald-600' : 'bg-purple-600'}">
+                                ${st.geomagneticOnline ? 'Deployed ✓' : 'Install Unit'}
+                            </button>
+                        </div>
+                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-700 flex justify-between items-center">
+                            <span class="text-xs font-bold text-purple-300">Satellite Dish Alignment:</span>
+                            <button id="btn-align-dish" class="px-3 py-1 rounded text-xs font-bold ${st.dishAligned ? 'bg-emerald-600' : 'bg-slate-700'}">
+                                ${st.dishAligned ? 'Aligned ✓' : 'Align Dish'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-dep-mag').onclick = () => {
+                const heldIdx = gameState.player.selectedSlot;
+                const held = gameState.player.inventory[heldIdx];
+                if (held && held.id === 'GEOMAGNETIC_COIL') {
+                    st.geomagneticOnline = true;
+                    removeFromInventory(heldIdx);
+                    SoundFX.playSolarShieldHum();
+                    renderSpaceUI();
+                } else showFeedback("Equip the Geomagnetic Deflector Unit in hand!", false);
+            };
+
+            document.getElementById('btn-align-dish').onclick = () => {
+                st.dishAligned = true;
+                SoundFX.playInstall();
+                dynamicVisuals.satelliteDish.rotation.x = Math.PI * 0.45;
+                renderSpaceUI();
+            };
+
+            apparatusActionBtn.innerText = "Synchronize Space Defense";
+            apparatusActionBtn.onclick = () => {
+                if (st.geomagneticOnline && st.dishAligned) {
+                    completeQuest(7);
+                    SoundFX.playSolarShieldHum();
+                    dynamicVisuals.auroralShield.material.opacity = 0.55;
+                    showFeedback("Geomagnetic auroral shield activated! Solar CME deflected, orbital telemetry secured.", true);
+                    setTimeout(closeStationInterface, 1400);
+                } else showFeedback("Both geomagnetic deflector and satellite dish must be calibrated!", false);
+            };
+        }
+
+        function showFeedback(msg, isSuccess) {
+            apparatusFeedback.classList.remove('hidden', 'bg-emerald-950/80', 'text-emerald-300', 'border-emerald-500', 'bg-rose-950/80', 'text-rose-300', 'border-rose-500');
+            apparatusFeedback.classList.add('border');
+            if (isSuccess) apparatusFeedback.classList.add('bg-emerald-950/80', 'text-emerald-300', 'border-emerald-500');
+            else apparatusFeedback.classList.add('bg-rose-950/80', 'text-rose-300', 'border-rose-500');
+            apparatusFeedback.innerText = msg;
+        }
+
+        /* ==========================================================================
+           12. QUEST PROGRESSION & HUD DIRECTIVES
+           ========================================================================== */
+        function completeQuest(index) {
+            if (gameState.quests[index].solved) return;
+            gameState.quests[index].solved = true;
+            SoundFX.playSuccessFanfare();
+            showToast(`SYLLABUS MISSION RESOLVED: ${gameState.quests[index].title}`, "🌟");
+
+            updateActiveQuestDirective();
+            renderQuestListUI();
+        }
+
+        function updateActiveQuestDirective() {
+            let nextIndex = gameState.quests.findIndex(q => !q.solved);
+            let solvedCount = gameState.quests.filter(q => q.solved).length;
+
+            document.getElementById('quest-tracker-btn-text').innerText = `Mission Log (${solvedCount}/8)`;
+
+            if (nextIndex === -1) {
+                document.getElementById('active-chapter-tag').innerText = "COMPLETE";
+                document.getElementById('current-quest-title').innerHTML = `<i data-lucide="award" class="w-4 h-4 text-emerald-400"></i> OMNIVERSE PROTOCOL MASTERED`;
+                document.getElementById('current-quest-desc').innerText = "Incredible achievement! You have mastered all 8 Form 3 KSSM Science syllabus modules.";
+                document.getElementById('current-quest-nav').innerText = "Omniverse: Fully Stabilized";
+            } else {
+                const cur = gameState.quests[nextIndex];
+                gameState.currentQuestIndex = nextIndex;
+                document.getElementById('active-chapter-tag').innerText = cur.chapter;
+                document.getElementById('current-quest-title').innerHTML = `<i data-lucide="crosshair" class="w-4 h-4 text-cyan-400"></i> ${cur.title}`;
+                document.getElementById('current-quest-desc').innerText = cur.desc;
+                document.getElementById('current-quest-nav').innerText = `${cur.coords}`;
+            }
+            lucide.createIcons();
+        }
+
+        function renderQuestListUI() {
+            const container = document.getElementById('quest-list-container');
+            container.innerHTML = '';
+            gameState.quests.forEach((q, idx) => {
+                const el = document.createElement('div');
+                el.className = `p-3 rounded-2xl border flex items-center justify-between ${q.solved ? 'bg-emerald-950/60 border-emerald-500/50' : 'bg-slate-900/80 border-slate-700/60'}`;
+                el.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${q.solved ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-cyan-400'}">${idx + 1}</span>
+                        <div>
+                            <h4 class="font-hud text-xs md:text-sm font-bold ${q.solved ? 'text-emerald-300' : 'text-slate-100'}">${q.title}</h4>
+                            <p class="text-[11px] text-slate-400">${q.chapter} • ${q.coords}</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-bold ${q.solved ? 'text-emerald-400' : 'text-slate-500'}">${q.solved ? 'COMPLETED ✓' : 'ACTIVE'}</span>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function showToast(title, icon = "📢") {
+            const b = document.getElementById('banner-notification');
+            document.getElementById('banner-title').innerText = title;
+            document.getElementById('banner-icon-slot').innerText = icon;
+            b.classList.remove('-translate-y-28', 'opacity-0');
+            b.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                b.classList.remove('translate-y-0', 'opacity-100');
+                b.classList.add('-translate-y-28', 'opacity-0');
+            }, 3200);
+        }
+
+        // Modals
+        const questLogModal = document.getElementById('quest-log-modal');
+        document.getElementById('btn-quest-log').onclick = () => { renderQuestListUI(); questLogModal.classList.remove('hidden'); };
+        document.getElementById('btn-close-quest-log').onclick = () => questLogModal.classList.add('hidden');
+
+        const codexModal = document.getElementById('codex-modal');
+        document.getElementById('btn-syllabus-codex').onclick = () => codexModal.classList.remove('hidden');
+        document.getElementById('btn-close-codex').onclick = () => codexModal.classList.add('hidden');
+
+        document.getElementById('btn-sound-toggle').onclick = () => {
+            SoundFX.muted = !SoundFX.muted;
+            document.getElementById('sound-icon').setAttribute('data-lucide', SoundFX.muted ? 'volume-x' : 'volume-2');
+            document.getElementById('sound-status-label').innerText = SoundFX.muted ? 'Audio OFF' : 'Audio ON';
+            lucide.createIcons();
+        };
+
+        /* ==========================================================================
+           13. HAZARDS & AMBIENT MONITORING
+           ========================================================================== */
+        const radOverlay = document.getElementById('rad-overlay');
+        const heatOverlay = document.getElementById('heat-overlay');
+        const envStatus = document.getElementById('environmental-hazard-text');
+        let geigerTimer = 0;
+
+        function checkEnvironmentalHazards(delta) {
+            const px = playerGroup.position.x;
+            const pz = playerGroup.position.z;
+            const distRad = Math.hypot(px, pz - 155);
+            const distThermal = Math.hypot(px - (-140), pz - (-60));
+
+            if (distRad < 32 && !gameState.quests[6].solved) {
+                const intens = 1 - distRad / 32;
+                radOverlay.style.opacity = (intens * 0.55).toString();
+                envStatus.className = "text-rose-400 flex items-center gap-1 font-bold";
+                envStatus.innerHTML = `<i data-lucide="alert-triangle" class="w-3 h-3 animate-ping"></i> Radiation: ${(intens * 70).toFixed(1)} mSv/h`;
+
+                geigerTimer += delta;
+                if (geigerTimer > (0.35 - intens * 0.25)) {
+                    SoundFX.playGeigerClick();
+                    geigerTimer = 0;
+                }
+            } else if (distThermal < 28 && !gameState.quests[1].solved) {
+                const intens = 1 - distThermal / 28;
+                heatOverlay.style.opacity = (intens * 0.5).toString();
+                envStatus.className = "text-amber-400 flex items-center gap-1 font-bold";
+                envStatus.innerHTML = `<i data-lucide="flame" class="w-3 h-3 animate-bounce"></i> Thermal Exotherm: ${gameState.puzzleStates.thermal.temp}°C`;
+            } else {
+                radOverlay.style.opacity = '0';
+                heatOverlay.style.opacity = '0';
+                envStatus.className = "text-emerald-400 flex items-center gap-1";
+                envStatus.innerHTML = `<i data-lucide="shield-check" class="w-3 h-3"></i> Environment: Stable`;
+            }
+
+            const bBadge = document.getElementById('current-biome-badge');
+            if (px < -60) bBadge.innerText = "VOXEL DESERT & FURNACE";
+            else if (px > 60) bBadge.innerText = "CHRONO CYBER-CITADEL";
+            else if (pz < -60) bBadge.innerText = "ANIMUS OPTIC CITADEL";
+            else if (pz > 60) bBadge.innerText = "IONIZING RADIATION CRATER";
+            else bBadge.innerText = "CENTRAL CROSSROADS";
+        }
+
+        function updateProximityCheck() {
+            let nearest = null;
+            let minDist = 999;
+            const px = playerGroup.position.x;
+            const pz = playerGroup.position.z;
+
+            for (let i = 0; i < interactables.length; i++) {
+                const it = interactables[i];
+                if (it.refData && it.refData.collected) continue;
+                const d = Math.hypot(px - it.position.x, pz - it.position.z);
+                if (d < it.radius && d < minDist) {
+                    minDist = d;
+                    nearest = it;
+                }
+            }
+
+            gameState.activeInteractable = nearest;
+            const prompt = document.getElementById('action-prompt');
+            if (nearest && !gameState.modalOpen) {
+                prompt.classList.remove('hidden');
+                prompt.classList.add('flex');
+                document.getElementById('action-prompt-label').innerText = nearest.name;
+                document.getElementById('action-key-tag').innerText = (nearest.action === 'harvest_item') ? 'E : HARVEST' : 'E : CALIBRATE';
+            } else {
+                prompt.classList.add('hidden');
+                prompt.classList.remove('flex');
+            }
+        }
+
+        /* ==========================================================================
+           14. FIXED-TIMESTEP 60 FPS MAIN GAME ENGINE LOOP
+           ========================================================================== */
+        const clock = new THREE.Clock();
+        let accumulator = 0;
+        const FIXED_STEP = 1 / 60; // Deterministic 60Hz physics step
+        let frameCount = 0;
+        let lastFpsUpdate = 0;
+
+        function physicsStep() {
+            if (gameState.modalOpen) return;
+
+            const moveZ = (inputState.backward - inputState.forward);
+            const moveX = (inputState.right - inputState.left);
+
+            if (moveZ !== 0 || moveX !== 0) {
+                const moveAngle = Math.atan2(moveX, moveZ);
+                const finalAngle = moveAngle + cameraState.theta;
+                const spd = gameState.player.speed * (inputState.sprint ? gameState.player.sprintMultiplier : 1.0);
+
+                const dispX = Math.sin(finalAngle) * spd;
+                const dispZ = Math.cos(finalAngle) * spd;
+
+                resolvePlayerMovement(playerGroup.position, dispX, dispZ, gameState.player.radius, 2.6);
+
+                playerGroup.rotation.y = THREE.MathUtils.lerp(playerGroup.rotation.y, finalAngle, 0.22);
+
+                const animFreq = inputState.sprint ? 20 : 12;
+                const timeSec = clock.oldTime * 0.001;
+                leftLeg.rotation.x = Math.sin(timeSec * animFreq) * 0.65;
+                rightLeg.rotation.x = -Math.sin(timeSec * animFreq) * 0.65;
+                leftArm.rotation.x = -Math.sin(timeSec * animFreq) * 0.55;
+                rightArm.rotation.x = Math.sin(timeSec * animFreq) * 0.55;
+                torso.position.y = 1.35 + Math.sin(timeSec * animFreq) * 0.08;
+                helmet.position.y = 2.5 + Math.sin(timeSec * animFreq) * 0.08;
+            } else {
+                leftLeg.rotation.x = THREE.MathUtils.lerp(leftLeg.rotation.x, 0, 0.2);
+                rightLeg.rotation.x = THREE.MathUtils.lerp(rightLeg.rotation.x, 0, 0.2);
+                leftArm.rotation.x = THREE.MathUtils.lerp(leftArm.rotation.x, 0, 0.2);
+                rightArm.rotation.x = THREE.MathUtils.lerp(rightArm.rotation.x, 0, 0.2);
+                torso.position.y = 1.35;
+                helmet.position.y = 2.5;
+            }
+
+            if (!gameState.player.isGrounded) {
+                playerGroup.position.y += gameState.player.jumpVel;
+                gameState.player.jumpVel -= gameState.player.gravity;
+                if (playerGroup.position.y <= 0) {
+                    playerGroup.position.y = 0;
+                    gameState.player.jumpVel = 0;
+                    gameState.player.isGrounded = true;
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const rawDelta = clock.getDelta();
+            const delta = Math.min(rawDelta, 0.1); // Clamp to prevent spiral of death
+            const time = clock.getElapsedTime();
+
+            // Fixed-timestep accumulator (max 3 substeps)
+            accumulator += delta;
+            let substeps = 0;
+            while (accumulator >= FIXED_STEP && substeps < 3) {
+                physicsStep();
+                accumulator -= FIXED_STEP;
+                substeps++;
+            }
+
+            // FPS Counter
+            frameCount++;
+            if (performance.now() - lastFpsUpdate >= 500) {
+                const fps = Math.round((frameCount * 1000) / (performance.now() - lastFpsUpdate));
+                document.getElementById('fps-display-text').innerText = `${fps} FPS`;
+                frameCount = 0;
+                lastFpsUpdate = performance.now();
+            }
+
+            // Camera Tracking
+            const tx = playerGroup.position.x;
+            const ty = playerGroup.position.y + 1.8;
+            const tz = playerGroup.position.z;
+
+            const cx = tx + cameraState.radius * Math.sin(cameraState.phi) * Math.sin(cameraState.theta);
+            const cy = ty + cameraState.radius * Math.cos(cameraState.phi);
+            const cz = tz + cameraState.radius * Math.sin(cameraState.phi) * Math.cos(cameraState.theta);
+
+            camera.position.x += (cx - camera.position.x) * 0.12;
+            camera.position.y += (cy - camera.position.y) * 0.12;
+            camera.position.z += (cz - camera.position.z) * 0.12;
+            camera.lookAt(tx, ty, tz);
+
+            // Harvestable Item Floating (avoiding per-frame object allocation)
+            for (let i = 0; i < harvestableItems.length; i++) {
+                const p = harvestableItems[i];
+                if (!p.collected) {
+                    p.mesh.rotation.y += 0.025;
+                    p.mesh.position.y = 0.9 + Math.sin(time * 2.5 + i) * 0.14;
+                }
+            }
+
+            // Ambient environmental updates
+            checkEnvironmentalHazards(delta);
+            renderRadarMinimap();
+            updateProximityCheck();
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = function() {
+            lucide.createIcons();
+            refreshInventoryUI();
+            updateHeldBanner();
+            updateActiveQuestDirective();
+            renderQuestListUI();
+            animate();
+        };
+    </script>
+</body>
+</html>
